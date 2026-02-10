@@ -1,0 +1,17 @@
+{
+  "name": "effect-azure-kv",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@effect/language-service": "^0.73.1",
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@azure/identity": "^4.13.0",
+    "@azure/keyvault-secrets": "^4.10.0",
+    "effect": "^3.19.16"
+  }
+}
