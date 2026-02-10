@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Config from "effect/Config";
 import * as Data from "effect/Data";
-import { Cause, ConfigError, ConfigProvider, Layer, Logger, pipe } from "effect";
+import { Cause, ConfigError, ConfigProvider, Context, HashSet, Layer, Logger, pipe } from "effect";
 import { SecretClient } from "@azure/keyvault-secrets";
 import { DefaultAzureCredential } from "@azure/identity";
 
@@ -14,10 +14,16 @@ export class KeyVaultConfigProviderError extends Data.TaggedError("KeyVaultConfi
     message?: string;
 }> { };
 
+export class AzureKVConfig extends Context.Tag("effect-azure-kv/index/AzureKVConfig")<
+    AzureKVConfig,
+    Config.Config<URL>
+>(){}
+
 class AzureKV extends Effect.Service<AzureKV>()("effect-azure-kv/index/AzureKV", {
     //accessors: true,
     effect: Effect.gen(function* () {
-        const url = yield* Config.url("KV_URL");
+        const getURL = yield* AzureKVConfig;
+        const url = yield* getURL;
         const credential = new DefaultAzureCredential();
         const kvClient = new SecretClient(url.href, credential);
 
@@ -59,8 +65,12 @@ class AzureKV extends Effect.Service<AzureKV>()("effect-azure-kv/index/AzureKV",
 }) { }
 
 const AzureConfigFlatProvider = ConfigProvider.makeFlat({
-    // @ts-ignore idek
-    load(path, _config, _split) {
+    load<A>(
+        path: readonly string[],
+        _config: Config.Config.Primitive<A>,
+        _split: boolean
+    //): Effect.Effect<A[], ConfigError.ConfigError, never> {
+    ) {
         return Effect.gen(function* () {
             const kv = yield* AzureKV;
 
@@ -78,8 +88,9 @@ const AzureConfigFlatProvider = ConfigProvider.makeFlat({
                 );
             }
 
-            return [secret.value];
+            return [secret.value] as A[];
         }).pipe(
+            //Effect.provide(AzureKV.Default),
             Effect.catchTag("KeyVaultError", (e) =>
                 Effect.fail(
                     ConfigError.SourceUnavailable(
@@ -88,14 +99,16 @@ const AzureConfigFlatProvider = ConfigProvider.makeFlat({
                         Cause.fail(e)
                     )
                 )
-            ));
+            ),
+        );
     },
+    enumerateChildren: (_path) => Effect.succeed(HashSet.empty()),
     patch: {
         _tag: "Empty",
     }
 });
 
-const AzureConfigProvider = ConfigProvider.fromFlat(AzureConfigFlatProvider);
+const AzureConfigProvider = ConfigProvider.fromFlat(AzureConfigFlatProvider)
 
 const main = Effect.gen(function* () {
     const test1 = yield* Config.string("TEST-01");
@@ -103,24 +116,18 @@ const main = Effect.gen(function* () {
     yield* Effect.log({ test1, test2 });
 });
 
-const Layers = Layer.mergeAll(
+const AzureKVConfigLive = Layer.succeed(AzureKVConfig, Config.url("KV_URL"));
+
+const AppLayer = Layer.mergeAll(
     AzureKV.Default,
     Logger.pretty,
+).pipe(
+    Layer.provideMerge(AzureKVConfigLive)
 );
-
-const jsonProvider = ConfigProvider.fromJson({
-    "TEST-01": "foo",
-    "TEST-02": "bar",
-});
-
-const Provider = ConfigProvider.orElse(
-    AzureConfigProvider,
-    () => jsonProvider,
-)
 
 pipe(
     main,
-    Effect.withConfigProvider(Provider),
-    Effect.provide(Layers),
+    Effect.withConfigProvider(AzureConfigProvider),
+    Effect.provide(AppLayer),
     Effect.runPromise,
 );
