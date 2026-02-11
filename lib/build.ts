@@ -7,6 +7,7 @@ const build = await Bun.build({
     metafile: true,
     minify: true,
     outdir: "build",
+    splitting: true,
 });
 
 const end = performance.now();
@@ -32,16 +33,17 @@ if (build.success) {
     const inLen = inKeys.length;
     const outLen = outKeys.length;
 
-    for (let i = 0; i < inLen + outLen - 1; i++) {
+    for (let i = 0; i < inLen; i++) {
         if (i < outLen) {
             const filePath = outKeys[i]!;
+            //console.log("out:", filePath);
             const file = meta.outputs[filePath]!;
             totalOut += file.bytes;
         } else {
             const filePath = inKeys[i]!;
+            //console.log(filePath);
             const file = meta.inputs[filePath]!;
             totalIn += file.bytes;
-
         }
     }
 
