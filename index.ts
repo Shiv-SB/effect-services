@@ -1,7 +1,7 @@
 import * as Effect from "effect/Effect";
 import * as Config from "effect/Config";
 import * as Data from "effect/Data";
-import { Cause, ConfigError, ConfigProvider, Context, HashSet, Layer, Logger, pipe } from "effect";
+import { Cause, ConfigError, ConfigProvider, HashSet, Layer, Logger, pipe } from "effect";
 import { SecretClient } from "@azure/keyvault-secrets";
 import { DefaultAzureCredential } from "@azure/identity";
 
@@ -14,14 +14,20 @@ export class KeyVaultConfigProviderError extends Data.TaggedError("KeyVaultConfi
     message?: string;
 }> { };
 
-export class AzureKVConfig extends Context.Tag("effect-azure-kv/index/AzureKVConfig")<
-    AzureKVConfig,
-    Config.Config<URL>
->(){}
+export class AzureKVConfig extends Effect.Service<AzureKVConfig>()("effect-azure-kv/index/AzureKVConfig", {
+    succeed: Effect.gen(function* () {
+        yield* Effect.log("Grabbing KV_URL...");
+        return yield* Config.url("KV_URL");
+    }).pipe(
+        Effect.tap(Effect.log("Grabbed KV_URL")),
+    )
+}){}
 
 class AzureKV extends Effect.Service<AzureKV>()("effect-azure-kv/index/AzureKV", {
     //accessors: true,
+    dependencies: [AzureKVConfig.Default],
     effect: Effect.gen(function* () {
+        yield* Effect.log("Constructing KV client...");
         const getURL = yield* AzureKVConfig;
         const url = yield* getURL;
         const credential = new DefaultAzureCredential();
@@ -47,6 +53,8 @@ class AzureKV extends Effect.Service<AzureKV>()("effect-azure-kv/index/AzureKV",
                 })
             });
 
+            yield* Effect.log("KV client constructed!");
+
             return {
                 get,
                 set
@@ -64,6 +72,13 @@ class AzureKV extends Effect.Service<AzureKV>()("effect-azure-kv/index/AzureKV",
     }),
 }) { }
 
+const ProviderLayer = AzureKV.Default.pipe(
+    Layer.provide(AzureKVConfig.Default.pipe(
+        //Layer.tap((ctx) => Effect.log(ctx.toString())),
+        Layer.tapError((e) => Effect.logError(e)),
+    )),
+);
+
 const AzureConfigFlatProvider = ConfigProvider.makeFlat({
     load<A>(
         path: readonly string[],
@@ -72,11 +87,12 @@ const AzureConfigFlatProvider = ConfigProvider.makeFlat({
     //): Effect.Effect<A[], ConfigError.ConfigError, never> {
     ) {
         return Effect.gen(function* () {
+            yield* Effect.log("Initialising KV...");
             const kv = yield* AzureKV;
 
             const key = path.join("-");
             // or ".", or "__", or whatever convention you want
-
+            yield* Effect.log("Getting...");
             const secret = yield* kv.secrets.get(key);
 
             if (!secret.value) {
@@ -90,7 +106,7 @@ const AzureConfigFlatProvider = ConfigProvider.makeFlat({
 
             return [secret.value] as A[];
         }).pipe(
-            //Effect.provide(AzureKV.Default),
+            Effect.provide(ProviderLayer),
             Effect.catchTag("KeyVaultError", (e) =>
                 Effect.fail(
                     ConfigError.SourceUnavailable(
@@ -110,23 +126,21 @@ const AzureConfigFlatProvider = ConfigProvider.makeFlat({
 
 const AzureConfigProvider = ConfigProvider.fromFlat(AzureConfigFlatProvider)
 
-const main = Effect.gen(function* () {
+const MainExample = Effect.gen(function* () {
+    yield* Effect.log("Starting...");
     const test1 = yield* Config.string("TEST-01");
     const test2 = yield* Config.string("TEST-02");
     yield* Effect.log({ test1, test2 });
 });
 
-const AzureKVConfigLive = Layer.succeed(AzureKVConfig, Config.url("KV_URL"));
 
-const AppLayer = Layer.mergeAll(
-    AzureKV.Default,
-    Logger.pretty,
-).pipe(
-    Layer.provideMerge(AzureKVConfigLive)
+const AppLayer = AzureKV.Default.pipe(
+    //Layer.provide(AzureKVConfig.Default),
+    Layer.provide(Logger.pretty),
 );
 
 pipe(
-    main,
+    MainExample,
     Effect.withConfigProvider(AzureConfigProvider),
     Effect.provide(AppLayer),
     Effect.runPromise,
