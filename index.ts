@@ -16,67 +16,67 @@ export class KeyVaultConfigProviderError extends Data.TaggedError("KeyVaultConfi
 }> { };
 
 export class AzureKVConfig extends Effect.Service<AzureKVConfig>()("effect-azure-kv/index/AzureKVConfig", {
-    succeed: Effect.gen(function* () {
-        yield* Effect.log("Grabbing KV_URL...");
-        return yield* Config.url("KV_URL");
-    }).pipe(
+    succeed: Config.url("KV_URL").pipe(
         Effect.withConfigProvider(ConfigProvider.fromEnv()),
         Effect.tap(Effect.log("Grabbed KV_URL")),
         Effect.withSpan("Azure_KV_Config"),
     )
 }) { }
 
+const CachedConfig = Layer.memoize(AzureKVConfig.Default);
+
 class AzureKV extends Effect.Service<AzureKV>()("effect-azure-kv/index/AzureKV", {
     //accessors: true,
     dependencies: [AzureKVConfig.Default],
-    effect: Effect.scoped(Layer.memoize(AzureKVConfig.Default).pipe(
-        Effect.andThen((memoised) =>
-            Effect.gen(function* () {
-                yield* Effect.log("Constructing KV client...");
-                const getURL = yield* Effect.provide(AzureKVConfig, memoised);
-                const url = yield* getURL;
-                const credential = new DefaultAzureCredential();
-                const kvClient = new SecretClient(url.href, credential);
+    effect: Effect.gen(function* () {
+        yield* Effect.log("Constructing KV client...");
+        const cachedConfig = yield* CachedConfig;
+        const getURL = yield* Effect.provide(AzureKVConfig, cachedConfig);
+        const url = yield* getURL;
+        const credential = new DefaultAzureCredential();
+        const kvClient = new SecretClient(url.href, credential);
 
-                const secrets = yield* Effect.gen(function* () {
-                    const get = (key: string) => Effect.tryPromise({
-                        try: () => kvClient.getSecret(key),
-                        catch: (e) => new KeyVaultError({
-                            cause: e,
-                            message: `Unable to get '${key}'`
-                        })
-                    });
+        const secrets = yield* Effect.gen(function* () {
+            const get = (key: string) => Effect.tryPromise({
+                try: () => kvClient.getSecret(key),
+                catch: (e) => new KeyVaultError({
+                    cause: e,
+                    message: `Unable to get '${key}'`
+                })
+            });
 
-                    const set = (
-                        key: string,
-                        value: string
-                    ) => Effect.tryPromise({
-                        try: () => kvClient.setSecret(key, value),
-                        catch: (e) => new KeyVaultError({
-                            cause: e,
-                            message: `Unable to get '${key}'`
-                        })
-                    });
+            const set = (
+                key: string,
+                value: string
+            ) => Effect.tryPromise({
+                try: () => kvClient.setSecret(key, value),
+                catch: (e) => new KeyVaultError({
+                    cause: e,
+                    message: `Unable to get '${key}'`
+                })
+            });
 
-                    yield* Effect.log("KV client constructed!");
+            yield* Effect.log("KV client constructed!");
 
-                    return {
-                        get,
-                        set
-                    };
-                });
+            return {
+                get,
+                set
+            };
+        });
 
-                return {
-                    _internals: {
-                        credential,
-                        kvClient,
-                    },
-                    secrets,
+        return {
+            _internals: {
+                credential,
+                kvClient,
+            },
+            secrets,
 
-                };
-            }),
-        )
-    ))
+        };
+    }).pipe(
+        Effect.scoped,
+        Effect.withLogSpan(crypto.randomUUID())
+    ),
+
 }) { }
 
 const ProviderLayer = AzureKV.Default.pipe(
@@ -86,6 +86,8 @@ const ProviderLayer = AzureKV.Default.pipe(
     )),
 );
 
+const CachedProviderLayer = Layer.memoize(ProviderLayer);
+
 const AzureConfigFlatProvider = ConfigProvider.makeFlat({
     load<A>(
         path: readonly string[],
@@ -93,42 +95,40 @@ const AzureConfigFlatProvider = ConfigProvider.makeFlat({
         _split: boolean
         //): Effect.Effect<A[], ConfigError.ConfigError, never> {
     ) {
-        return Effect.scoped(
-            Layer.memoize(ProviderLayer).pipe(
-                Effect.andThen((memoised) => Effect.gen(function* () {
-                    yield* Effect.log("Initialising KV...");
-                    const kv = yield* Effect.provide(AzureKV, memoised);
+        return Effect.gen(function* () {
+            yield* Effect.log("Layer is getting KV Client...");
+            const cachedLayer = yield* CachedProviderLayer;
+            const kv = yield* Effect.provide(AzureKV, cachedLayer);
+            const kv2 = yield* Effect.provide(AzureKV, cachedLayer);
 
-                    const key = path.join("-");
-                    // or ".", or "__", or whatever convention you want
-                    yield* Effect.log("Getting...");
-                    const secret = yield* kv.secrets.get(key);
+            const key = path.join("-");
+            // or ".", or "__", or whatever convention you want
+            yield* Effect.log(`Getting key '${key}'...`);
+            const secret = yield* kv.secrets.get(key);
 
-                    if (!secret.value) {
-                        return yield* Effect.fail(
-                            ConfigError.MissingData(
-                                path as string[],
-                                `Missing Key Vault secret: ${key}`
-                            )
-                        );
-                    }
+            if (!secret.value) {
+                return yield* Effect.fail(
+                    ConfigError.MissingData(
+                        path as string[],
+                        `Missing Key Vault secret: ${key}`
+                    )
+                );
+            }
 
-                    return [secret.value] as A[];
-                }).pipe(
-                    //Effect.provide(ProviderLayer),
-                    Effect.catchTag("KeyVaultError", (e) =>
-                        Effect.fail(
-                            ConfigError.SourceUnavailable(
-                                path as string[],
-                                e.message ?? "Azure Key Vault unavailable",
-                                Cause.fail(e)
-                            )
-                        )
-                    ),
-                ))
-            )
+            return [secret.value] as A[];
+        }).pipe(
+            Effect.scoped,
+            Effect.withLogSpan("Config_provider"),
+            Effect.catchTag("KeyVaultError", (e) =>
+                Effect.fail(
+                    ConfigError.SourceUnavailable(
+                        path as string[],
+                        e.message ?? "Azure Key Vault unavailable",
+                        Cause.fail(e)
+                    )
+                )
+            ),
         )
-
     },
     enumerateChildren: (_path) => Effect.succeed(HashSet.empty()),
     patch: {
@@ -145,10 +145,47 @@ const AzureConfigProvider = ConfigProvider.fromFlat(AzureConfigFlatProvider)
 
 const MainExample = Effect.gen(function* () {
     yield* Effect.log("Starting...");
-    const test1 = yield* Config.string("TEST-01");
-    const test2 = yield* Config.string("TEST-02");
+    const test1 = yield* Config.string("TEST-01").pipe(Effect.withLogSpan("TEST-01"));
+    const test2 = yield* Config.string("TEST-02").pipe(Effect.withLogSpan("TEST-02"));
     yield* Effect.log({ test1, test2 });
 });
+
+const Test = Effect.gen(function* () {
+    const kv1 = yield* AzureKV;
+    const kv2 = yield* AzureKV;
+
+    const test1 = yield* Config.string("TEST-01").pipe(
+        Config.withDefault("DEFAULT")
+    );
+
+    const test2 = yield* Config.string("TEST-02").pipe(
+        Config.withDefault("DEFAULT")
+    );
+
+    yield* Effect.log({ test1, test2 });
+});
+
+const generateTestMap = Effect.gen(function* () {
+    return new Map<string, string>([
+        ["TEST-01", "foo"],
+        ["TEST-02", "bar"],
+    ]);
+});
+
+const runnnable = Effect.Do.pipe(
+    Effect.bind("map", () => generateTestMap),
+    Effect.map(({ map }) => Test.pipe(
+        Effect.withConfigProvider(ConfigProvider.fromMap(map))
+    ))
+)
+
+pipe(
+    runnnable,
+    Effect.provide(AzureKV.Default),
+    //Effect.withConfigProvider
+    Effect.runPromise,
+)
+
 
 const AppLayerLive = AzureKV.Default.pipe(
     //Layer.provide(AzureKVConfig.Default),
@@ -161,19 +198,11 @@ const AppLayerDev = Layer.mergeAll(
     DevTools.layer(),
 );
 
-const DeconstructedMemo = (
-    program: Effect.Effect<unknown, unknown, unknown>
-) => Effect.scoped(
-    Layer.memoize(AzureKV.Default).pipe(
-        Effect.andThen((memo) => program)
-    )
-)
-
-pipe(
+/*pipe(
     MainExample,
     Effect.withConfigProvider(AzureConfigProvider),
     //Effect.provide(AppLayerLive),
     Effect.provide(AppLayerDev),
     Effect.runPromise,
-);
+);*/
 
