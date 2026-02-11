@@ -4,6 +4,7 @@ import * as Data from "effect/Data";
 import { Cause, ConfigError, ConfigProvider, HashSet, Layer, Logger, pipe } from "effect";
 import { SecretClient } from "@azure/keyvault-secrets";
 import { DefaultAzureCredential } from "@azure/identity";
+import { DevTools } from "@effect/experimental";
 
 export class KeyVaultError extends Data.TaggedError("KeyVaultError")<{
     cause?: unknown;
@@ -19,7 +20,9 @@ export class AzureKVConfig extends Effect.Service<AzureKVConfig>()("effect-azure
         yield* Effect.log("Grabbing KV_URL...");
         return yield* Config.url("KV_URL");
     }).pipe(
+        Effect.withConfigProvider(ConfigProvider.fromEnv()),
         Effect.tap(Effect.log("Grabbed KV_URL")),
+        Effect.withSpan("Azure_KV_Config"),
     )
 }){}
 
@@ -133,15 +136,16 @@ const MainExample = Effect.gen(function* () {
     yield* Effect.log({ test1, test2 });
 });
 
-
 const AppLayer = AzureKV.Default.pipe(
     //Layer.provide(AzureKVConfig.Default),
     Layer.provide(Logger.pretty),
+    Layer.merge(DevTools.layer()),
 );
 
 pipe(
     MainExample,
     Effect.withConfigProvider(AzureConfigProvider),
-    Effect.provide(AppLayer),
+    //Effect.provide(AppLayer),
+    Effect.provide(DevTools.layer()),
     Effect.runPromise,
 );
