@@ -4,7 +4,9 @@
   "type": "module",
   "devDependencies": {
     "@effect/language-service": "^0.73.1",
-    "@types/bun": "latest"
+    "@effect/experimental": "^0.58.0",
+    "@types/bun": "latest",
+    "ts-humanize": "^1.0.2"
   },
   "peerDependencies": {
     "typescript": "^5"
@@ -12,7 +14,6 @@
   "dependencies": {
     "@azure/identity": "^4.13.0",
     "@azure/keyvault-secrets": "^4.10.0",
-    "@effect/experimental": "^0.58.0",
     "effect": "^3.19.16"
   }
 }

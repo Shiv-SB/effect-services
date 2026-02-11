@@ -1,208 +1,92 @@
-import * as Effect from "effect/Effect";
-import * as Config from "effect/Config";
-import * as Data from "effect/Data";
-import { Cause, ConfigError, ConfigProvider, HashSet, Layer, Logger, pipe } from "effect";
-import { SecretClient } from "@azure/keyvault-secrets";
-import { DefaultAzureCredential } from "@azure/identity";
-import { DevTools } from "@effect/experimental";
+import { SecretClient, type SecretClientOptions } from "@azure/keyvault-secrets";
+import { DefaultAzureCredential, type TokenCredential } from "@azure/identity";
+import { Cache, Config, ConfigProvider, Context, Data, Effect, Layer } from "effect";
 
 export class KeyVaultError extends Data.TaggedError("KeyVaultError")<{
     cause?: unknown;
     message?: string;
-}> { }
+}>{}
 
-export class KeyVaultConfigProviderError extends Data.TaggedError("KeyVaultConfigProviderError")<{
-    message?: string;
-}> { };
+interface KeyVaultImpl {
+    use: <T>(
+        fn: (client: SecretClient) => T
+    ) => Effect.Effect<Awaited<T>, KeyVaultError, never>
+}
 
-export class AzureKVConfig extends Effect.Service<AzureKVConfig>()("effect-azure-kv/index/AzureKVConfig", {
-    succeed: Config.url("KV_URL").pipe(
-        Effect.withConfigProvider(ConfigProvider.fromEnv()),
-        Effect.tap(Effect.log("Grabbed KV_URL")),
-        Effect.withSpan("Azure_KV_Config"),
-    )
-}) { }
+export class KeyVault extends Context.Tag("effect-azure-kv/client/KeyVault")<
+    KeyVault, 
+    KeyVaultImpl
+>(){}
 
-const CachedConfig = Layer.memoize(AzureKVConfig.Default);
+type SecretClientArgs = {
+    vaultURL: string;
+    credential: TokenCredential;
+    pipelineOptions?: SecretClientOptions;
+};
 
-class AzureKV extends Effect.Service<AzureKV>()("effect-azure-kv/index/AzureKV", {
-    //accessors: true,
-    dependencies: [AzureKVConfig.Default],
-    effect: Effect.gen(function* () {
-        yield* Effect.log("Constructing KV client...");
-        const cachedConfig = yield* CachedConfig;
-        const getURL = yield* Effect.provide(AzureKVConfig, cachedConfig);
-        const url = yield* getURL;
-        const credential = new DefaultAzureCredential();
-        const kvClient = new SecretClient(url.href, credential);
+export const make = (
+    options: SecretClientArgs
+) => Effect.gen(function* () {
+    const client = new SecretClient(
+        options.vaultURL,
+        options.credential,
+        options.pipelineOptions
+    );
 
-        const secrets = yield* Effect.gen(function* () {
-            const get = (key: string) => Effect.tryPromise({
-                try: () => kvClient.getSecret(key),
+    return KeyVault.of({
+        use: (fn) => Effect.gen(function* () {
+            const result = yield* Effect.try({
+                try: () => fn(client),
                 catch: (e) => new KeyVaultError({
                     cause: e,
-                    message: `Unable to get '${key}'`
+                    message: "Syncronous error in 'KeyVault.use'"
                 })
             });
 
-            const set = (
-                key: string,
-                value: string
-            ) => Effect.tryPromise({
-                try: () => kvClient.setSecret(key, value),
-                catch: (e) => new KeyVaultError({
-                    cause: e,
-                    message: `Unable to get '${key}'`
-                })
-            });
-
-            yield* Effect.log("KV client constructed!");
-
-            return {
-                get,
-                set
-            };
-        });
-
-        return {
-            _internals: {
-                credential,
-                kvClient,
-            },
-            secrets,
-
-        };
-    }).pipe(
-        Effect.scoped,
-        Effect.withLogSpan(crypto.randomUUID())
-    ),
-
-}) { }
-
-const ProviderLayer = AzureKV.Default.pipe(
-    Layer.provide(AzureKVConfig.Default.pipe(
-        //Layer.tap((ctx) => Effect.log(ctx.toString())),
-        Layer.tapError((e) => Effect.logError(e)),
-    )),
-);
-
-const CachedProviderLayer = Layer.memoize(ProviderLayer);
-
-const AzureConfigFlatProvider = ConfigProvider.makeFlat({
-    load<A>(
-        path: readonly string[],
-        _config: Config.Config.Primitive<A>,
-        _split: boolean
-        //): Effect.Effect<A[], ConfigError.ConfigError, never> {
-    ) {
-        return Effect.gen(function* () {
-            yield* Effect.log("Layer is getting KV Client...");
-            const cachedLayer = yield* CachedProviderLayer;
-            const kv = yield* Effect.provide(AzureKV, cachedLayer);
-            const kv2 = yield* Effect.provide(AzureKV, cachedLayer);
-
-            const key = path.join("-");
-            // or ".", or "__", or whatever convention you want
-            yield* Effect.log(`Getting key '${key}'...`);
-            const secret = yield* kv.secrets.get(key);
-
-            if (!secret.value) {
-                return yield* Effect.fail(
-                    ConfigError.MissingData(
-                        path as string[],
-                        `Missing Key Vault secret: ${key}`
-                    )
-                );
+            if (result instanceof Promise) {
+                return yield* Effect.tryPromise({
+                    try: () => result,
+                    catch: (e) => new KeyVaultError({
+                        cause: e,
+                        message: "Asyncronous error in 'KeyVault.use'"
+                    })
+                });
+            } else {
+                return result;
             }
+        })
+    });
+});
 
-            return [secret.value] as A[];
+export const layer = (
+    options: SecretClientArgs
+) => Layer.scoped(KeyVault, make({
+    credential: options.credential,
+    vaultURL: options.vaultURL,
+    pipelineOptions: options.pipelineOptions
+}));
+
+export const fromEnv = Layer.scoped(
+    KeyVault,
+    Effect.gen(function* () {
+        const url = yield* Config.url("KV_URL")
+        return yield* make({
+            vaultURL: url.href,
+            credential: new DefaultAzureCredential()
         }).pipe(
-            Effect.scoped,
-            Effect.withLogSpan("Config_provider"),
-            Effect.catchTag("KeyVaultError", (e) =>
-                Effect.fail(
-                    ConfigError.SourceUnavailable(
-                        path as string[],
-                        e.message ?? "Azure Key Vault unavailable",
-                        Cause.fail(e)
-                    )
-                )
-            ),
-        )
-    },
-    enumerateChildren: (_path) => Effect.succeed(HashSet.empty()),
-    patch: {
-        _tag: "Empty",
-    }
-});
-
-const AzureConfigProvider = ConfigProvider.fromFlat(AzureConfigFlatProvider)
-
-// Every Config.* is creating a brand new KV client
-// Meaning KV client is not getting memoised
-// I think this is because it is being provided locally.
-// I need to try and explicity memoise
-
-const MainExample = Effect.gen(function* () {
-    yield* Effect.log("Starting...");
-    const test1 = yield* Config.string("TEST-01").pipe(Effect.withLogSpan("TEST-01"));
-    const test2 = yield* Config.string("TEST-02").pipe(Effect.withLogSpan("TEST-02"));
-    yield* Effect.log({ test1, test2 });
-});
-
-const Test = Effect.gen(function* () {
-    const kv1 = yield* AzureKV;
-    const kv2 = yield* AzureKV;
-
-    const test1 = yield* Config.string("TEST-01").pipe(
-        Config.withDefault("DEFAULT")
-    );
-
-    const test2 = yield* Config.string("TEST-02").pipe(
-        Config.withDefault("DEFAULT")
-    );
-
-    yield* Effect.log({ test1, test2 });
-});
-
-const generateTestMap = Effect.gen(function* () {
-    return new Map<string, string>([
-        ["TEST-01", "foo"],
-        ["TEST-02", "bar"],
-    ]);
-});
-
-const runnnable = Effect.Do.pipe(
-    Effect.bind("map", () => generateTestMap),
-    Effect.map(({ map }) => Test.pipe(
-        Effect.withConfigProvider(ConfigProvider.fromMap(map))
-    ))
-)
-
-pipe(
-    runnnable,
-    Effect.provide(AzureKV.Default),
-    //Effect.withConfigProvider
-    Effect.runPromise,
-)
-
-
-const AppLayerLive = AzureKV.Default.pipe(
-    //Layer.provide(AzureKVConfig.Default),
-    Layer.provide(Logger.pretty),
-    Layer.merge(DevTools.layer()),
+            Effect.withConfigProvider(ConfigProvider.fromEnv()),
+        );
+    })
 );
 
-const AppLayerDev = Layer.mergeAll(
-    Logger.pretty,
-    DevTools.layer(),
-);
-
-/*pipe(
-    MainExample,
-    Effect.withConfigProvider(AzureConfigProvider),
-    //Effect.provide(AppLayerLive),
-    Effect.provide(AppLayerDev),
-    Effect.runPromise,
-);*/
-
+export class KeyVaultAsCache extends Effect.Service<KeyVaultAsCache>()("effect-azure-kv/client/KeyVaultAsCache", {
+    dependencies: [fromEnv],
+    effect: (options: Omit<Parameters<typeof Cache["make"]>[0], "lookup">) => Effect.gen(function* () {
+        const kv = yield* KeyVault;
+        const cache = yield* Cache.make({
+            ...options,
+            lookup: (key: string) => kv.use((c) => c.getSecret(key)),
+        });
+        return cache;
+    })
+}){}
