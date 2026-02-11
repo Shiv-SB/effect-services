@@ -1,6 +1,6 @@
 import { SecretClient, type SecretClientOptions } from "@azure/keyvault-secrets";
 import { DefaultAzureCredential, type TokenCredential } from "@azure/identity";
-import { Config, Context, Data, Effect, Layer, Logger, pipe } from "effect";
+import { Config, Context, Data, Effect, Layer } from "effect";
 
 export class KeyVaultError extends Data.TaggedError("KeyVaultError")<{
     cause?: unknown;
