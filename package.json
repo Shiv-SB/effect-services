@@ -4,10 +4,9 @@
   "module": "index.ts",
   "types": "index.d.ts",
   "type": "module",
-  "private": true,
   "scripts": {
     "build": "bun lib/build",
-    "generate:types": "bunx tsc --p tsconfig.build.json"
+    "prepublishOnly": "bun run build"
   },
   "devDependencies": {
     "@effect/language-service": "^0.73.1",
@@ -16,14 +15,31 @@
     "ts-humanize": "^1.0.2"
   },
   "peerDependencies": {
-    "typescript": "^5"
-  },
-  "dependencies": {
-    "@azure/identity": "^4.13.0",
-    "@azure/keyvault-secrets": "^4.10.0",
+    "typescript": "^5",
     "effect": "^3.19.16"
   },
-  "files": [
-    "build"
-  ]
+  "dependencies": {
+    "@azure/cosmos": "^4.9.1",
+    "@azure/identity": "^4.13.0",
+    "@azure/keyvault-secrets": "^4.10.0"
+  },
+  "files": ["build"],
+  "exports": {
+    ".": {
+      "types": "./build/index.d.ts",
+      "import": "./build/index.js"
+    },
+    "./imanage": {
+      "types": "./build/imanage/index.d.ts",
+      "import": "./build/imanage/index.js"
+    },
+    "./keyvault": {
+      "types": "./build/keyvault/index.d.ts",
+      "import": "./build/keyvault/index.js"
+    },
+    "./legl": {
+      "types": "./build/legl/index.d.ts",
+      "import": "./build/legl/index.js"
+    }
+  }
 }

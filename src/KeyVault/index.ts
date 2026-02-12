@@ -1,7 +1,13 @@
 import { SecretClient, type SecretClientOptions } from "@azure/keyvault-secrets";
 import { DefaultAzureCredential, type TokenCredential } from "@azure/identity";
-import { Cache, Config, ConfigProvider, Context, Data, Effect, Layer } from "effect";
-
+import * as Cache from "effect/Cache";
+import * as Config from "effect/Config";
+import * as ConfigProvider from "effect/ConfigProvider";
+import * as Context from "effect/Context";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
+import * as Layer from "effect/Layer";
+  
 export class KeyVaultError extends Data.TaggedError("KeyVaultError")<{
     cause?: unknown;
     message?: string;
@@ -60,11 +66,7 @@ export const make = (
 
 export const layer = (
     options: SecretClientArgs
-) => Layer.scoped(KeyVault, make({
-    credential: options.credential,
-    vaultURL: options.vaultURL,
-    pipelineOptions: options.pipelineOptions
-}));
+) => Layer.scoped(KeyVault, make(options));
 
 export const fromEnv = Layer.scoped(
     KeyVault,

@@ -30,5 +30,6 @@
     
     "outDir": "build"
   },
-  "include": ["index.ts"],
+  "include": ["src"],
+  "exclude": ["**/*.test.ts"]
 }
