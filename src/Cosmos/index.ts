@@ -6,7 +6,6 @@ import * as Layer from "effect/Layer";
 import * as Config from "effect/Config";
 import * as Cache from "effect/Cache";
 import { Container, CosmosClient, type ItemDefinition } from "@azure/cosmos";
-import { pipe } from "effect";
 
 export class CosmosError extends Data.TaggedError("CosmosError")<{
     cause?: unknown;
@@ -82,9 +81,9 @@ export class Cosmos extends Effect.Service<Cosmos>()("Cosmos", {
         const container = (containerName: string) => Effect.gen(function* () {
             const _container = _database.container(containerName);
 
-            const upsert = <T>(record: T) => Effect.gen(function* () {
+            const upsert = <T extends ItemDefinition>(record: T) => Effect.gen(function* () {
                 const req = Effect.tryPromise({
-                    try: () => _container.items.upsert(record, { disableAutomaticIdGeneration: true }),
+                    try: () => _container.items.upsert<T>(record, { disableAutomaticIdGeneration: true }),
                     catch(err) {
                         return new CosmosError({
                             cause: err,
