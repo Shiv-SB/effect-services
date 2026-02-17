@@ -41,6 +41,10 @@
     "./cosmos": {
       "types": "./build/cosmos/index.d.ts",
       "import": "./build/cosmos/index.js"
+    },
+    "./msgraph": {
+      "types": "./build/MsGraph/index.d.ts",
+      "import": "./build/MsGraph/index.js"
     }
   }
 }
