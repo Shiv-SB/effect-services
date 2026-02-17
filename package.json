@@ -8,6 +8,9 @@
     "build": "bun lib/build",
     "prepublishOnly": "bun run build"
   },
+  "repository": {
+    "url": "https://github.com/Shiv-SB/effect-services"
+  },
   "devDependencies": {
     "@effect/language-service": "^0.73.1",
     "@effect/experimental": "^0.58.0",
