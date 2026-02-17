@@ -4,16 +4,17 @@ import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as S from "effect/Schema";
 import { Client } from "@microsoft/microsoft-graph-client";
 import { ClientSecretCredential } from "@azure/identity";
 import {
-    TokenCredentialAuthenticationProvider 
+    TokenCredentialAuthenticationProvider
 } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";
 
 export class MsGraphError extends Data.TaggedError("MsGraphError")<{
     cause?: unknown;
     message: string;
-}>{}
+}> { }
 
 interface MsGraphImpl {
     use: <T>(
@@ -24,13 +25,13 @@ interface MsGraphImpl {
 export class MsGraph extends Context.Tag("effect-services/MsGraph/index2/MsGraph")<
     MsGraph,
     MsGraphImpl
->(){}
+>() { }
 
 type MsGraphArgs = {
-    tenantID: string;
-    clientID: string;
-    clientSecret: string;
-    scopes: string[];
+    readonly tenantID: string;
+    readonly clientID: string;
+    readonly clientSecret: string;
+    readonly scopes: string[];
 }
 
 export const make = (
@@ -83,7 +84,9 @@ export const fromEnv = Layer.scoped(
         const tenantID = yield* Config.string("MSGRAPH_TENANT_ID");
         const clientID = yield* Config.string("MSGRAPH_CLIENT_ID");
         const clientSecret = yield* Config.string("MSGRAPH_CLIENT_SECRET");
-        const scopes = yield* Config.array(Config.string(), "MS_GRAPH_SCOPES");
+        const scopes = yield* Config.array(Config.string(), "MS_GRAPH_SCOPES").pipe(
+            Config.withDefault<string[]>(["https://graph.microsoft.com/.default"]),
+        );
 
         return yield* make({
             tenantID,
@@ -95,3 +98,11 @@ export const fromEnv = Layer.scoped(
         );
     })
 );
+
+
+// TODO: implement stream factory similar to Legl
+export const PaginationFields = S.Struct({
+    "@odata.context": S.URL,
+    "@odata.nextLink": S.URL,
+    value: S.Array(S.Unknown),
+});
