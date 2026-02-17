@@ -1,0 +1,61 @@
+name: Publish to NPM
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          version: "latest"
+      
+      - name: Setup NPM
+        uses: actions/setup-node@v5
+        # using sudo because of https://github.com/actions/setup-node/issues/324#issuecomment-970306807
+      - run: sudo npm install -g npm@latest # npm 11.5.1 or later is required for OIDC
+      - run: echo npm version $(npm --version)
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Show bun debug values
+        run: bun --revision
+      - run: uname -mprs
+
+      - name: Validate package.json version matched tag
+        run: |
+          PACKAGE_VERSION=$(bun pm pkg get version | tr -d '"')
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          echo "Package version: $PACKAGE_VERSION"
+          echo "Tag version: $TAG_VERSION"
+          if [ "$PACKAGE_VERSION" != "$TAG_VERSION" ]; then
+            echo "Version mismatch: package.json has $PACKAGE_VERSION but tag is $TAG_VERSION. Run 'bun pm version' to increment version"
+            exit 1
+          fi
+          echo "Version matches: $PACKAGE_VERSION"
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Audit vulnerablities
+        run: bun audit
+
+      - name: Build package
+        run: bun run build
+
+      - name: Publish to NPM
+        # Use NPM instead of bun:
+        # https://github.com/oven-sh/bun/issues/22423
+        # https://github.com/oven-sh/bun/issues/15601
+        run: npm publish 
