@@ -37,7 +37,7 @@ type StreamFactoryArgs<Dec, Enc> = {
     schema: S.Schema<Dec, Enc>;
 };
 
-export class FreshServiceConfig extends Context.Tag("effect-azure-kv/FreshService/index/FreshServiceConfig")<FreshServiceConfig, {
+export class FreshServiceConfig extends Context.Tag("effect-services/FreshService/index/FreshServiceConfig")<FreshServiceConfig, {
     readonly baseURL: URL;
     readonly token: Redacted.Redacted<string>;
 }>(){}

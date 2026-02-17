@@ -1,5 +1,5 @@
 {
-  "name": "effect-azure-kv",
+  "name": "effect-services",
   "version": "1.0.0",
   "module": "index.ts",
   "types": "index.d.ts",
@@ -25,10 +25,6 @@
   },
   "files": ["build"],
   "exports": {
-    ".": {
-      "types": "./build/index.d.ts",
-      "import": "./build/index.js"
-    },
     "./imanage": {
       "types": "./build/imanage/index.d.ts",
       "import": "./build/imanage/index.js"
@@ -40,6 +36,10 @@
     "./legl": {
       "types": "./build/legl/index.d.ts",
       "import": "./build/legl/index.js"
+    },
+    "./cosmos": {
+      "types": "./build/cosmos/index.d.ts",
+      "import": "./build/cosmos/index.js"
     }
   }
 }

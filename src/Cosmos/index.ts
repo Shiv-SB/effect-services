@@ -12,7 +12,7 @@ export class CosmosError extends Data.TaggedError("CosmosError")<{
     message: string;
 }> {}
 
-export class CosmosConfig extends Context.Tag("effect-azure-kv/Cosmos/index/CosmosConfig")<CosmosConfig, {
+export class CosmosConfig extends Context.Tag("effect-services/Cosmos/index/CosmosConfig")<CosmosConfig, {
     readonly connectionString: Redacted.Redacted<string>;
     readonly databaseID: string;
 }>(){}
@@ -23,7 +23,7 @@ interface CosmosContainerImpl {
     ) => Effect.Effect<Awaited<T>, CosmosError, never>
 };
 
-export class CosmosContainer extends Context.Tag("effect-azure-kv/Cosmos/index/CosmosContainer")<
+export class CosmosContainer extends Context.Tag("effect-services/Cosmos/index/CosmosContainer")<
     CosmosContainer, 
     CosmosContainerImpl
 >(){}
@@ -139,7 +139,7 @@ export const containerFromEnv = Layer.scoped(
     })
 )
 
-export class CosmosContainerAsCache extends Effect.Service<CosmosContainerAsCache>()("effect-azure-kv/Cosmos/index/CosmosContainerAsCache", {
+export class CosmosContainerAsCache extends Effect.Service<CosmosContainerAsCache>()("effect-services/Cosmos/index/CosmosContainerAsCache", {
     dependencies: [containerFromEnv],
     effect: (
         options: Omit<Parameters<typeof Cache["make"]>[0], "lookup">

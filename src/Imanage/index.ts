@@ -12,7 +12,7 @@ type OAuthToken = {
     expiresAt_epochMs: number;
 }
 
-export class ImanageConfig extends Context.Tag("effect-azure-kv/Imanage/index/ImanageConfig")<ImanageConfig, {
+export class ImanageConfig extends Context.Tag("effect-services/Imanage/index/ImanageConfig")<ImanageConfig, {
     readonly username: string;
     readonly password: Redacted.Redacted<string>;
     readonly client_id: string;

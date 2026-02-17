@@ -1,4 +1,4 @@
-# effect-azure-kv
+# Key Vault
 
 Key Vault Service for Effect
 
@@ -8,7 +8,7 @@ This library is a lightweight Effect wrapper for the Azure Secrets Key Vault.
 
 ```ts
 import { Effect, Layer, Logger, pipe } from "effect";
-import * as KeyVault from "effect-azure-kv";
+import KeyVault from "effect-services/KeyVault";
 
 // Example with standard KeyVault service
 const Example = Effect.gen(function* () {

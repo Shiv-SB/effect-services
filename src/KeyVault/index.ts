@@ -19,7 +19,7 @@ interface KeyVaultImpl {
     ) => Effect.Effect<Awaited<T>, KeyVaultError, never>
 }
 
-export class KeyVault extends Context.Tag("effect-azure-kv/client/KeyVault")<
+export class KeyVault extends Context.Tag("effect-services/client/KeyVault")<
     KeyVault,
     KeyVaultImpl
 >() { }
@@ -81,7 +81,7 @@ export const fromEnv = Layer.scoped(
     })
 );
 
-export class KeyVaultAsCache extends Effect.Service<KeyVaultAsCache>()("effect-azure-kv/client/KeyVaultAsCache", {
+export class KeyVaultAsCache extends Effect.Service<KeyVaultAsCache>()("effect-services/client/KeyVaultAsCache", {
     dependencies: [fromEnv],
     effect: (options: Omit<Parameters<typeof Cache["make"]>[0], "lookup">) => Effect.gen(function* () {
         const kv = yield* KeyVault;

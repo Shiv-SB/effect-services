@@ -13,12 +13,12 @@ type StreamArgs = {
     queryParams?: ConstructorParameters<typeof URLSearchParams>[0];
 }
 
-export class LeglConfig extends Context.Tag("effect-azure-kv/Legl/index/LeglConfig")<LeglConfig, {
+export class LeglConfig extends Context.Tag("effect-services/Legl/index/LeglConfig")<LeglConfig, {
     readonly baseURL: URL;
     readonly bearerToken: R.Redacted<string>;
 }>(){}
 
-export class LeglService extends Effect.Service<LeglService>()("effect-azure-kv/Legl/index/LeglService", {
+export class LeglService extends Effect.Service<LeglService>()("effect-services/Legl/index/LeglService", {
     effect: Effect.gen(function* () {
         const conf = yield* LeglConfig;
         const baseURL = conf.baseURL;
