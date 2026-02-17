@@ -7,11 +7,11 @@ import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
-  
+
 export class KeyVaultError extends Data.TaggedError("KeyVaultError")<{
     cause?: unknown;
     message?: string;
-}>{}
+}> { }
 
 interface KeyVaultImpl {
     use: <T>(
@@ -20,9 +20,9 @@ interface KeyVaultImpl {
 }
 
 export class KeyVault extends Context.Tag("effect-azure-kv/client/KeyVault")<
-    KeyVault, 
+    KeyVault,
     KeyVaultImpl
->(){}
+>() { }
 
 type SecretClientArgs = {
     vaultURL: string;
@@ -91,4 +91,4 @@ export class KeyVaultAsCache extends Effect.Service<KeyVaultAsCache>()("effect-a
         });
         return cache;
     })
-}){}
+}) { }
