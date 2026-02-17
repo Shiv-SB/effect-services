@@ -102,7 +102,7 @@ export class Freshservice extends Effect.Service<Freshservice>()("Freshservice",
 
                     // Return the decoded data and optional next URL
                     // When nextUrl is null, returns Option.none() to stop pagination
-                    return [decoded, Option.fromNullable(nextUrl)] as const;
+                    return [decoded, Option.fromNullable(nextUrl)];
                 }),
             ).pipe(
                 Stream.onEnd(Effect.log(`Stream complete for ${args.path}`))

@@ -1,5 +1,6 @@
 import { bytes, commify } from "ts-humanize";
 import path from "node:path";
+import fs from "node:fs/promises";
 
 // # region Utils
 
@@ -36,6 +37,16 @@ function getAllIndexFiles(): string[] {
 
     return files;
 }
+
+async function deleteBuildFolder() {
+    await fs.rm("build", { recursive: true, force: true });
+}
+
+// #region Delete
+
+printC("orange", "Deleting current build folder...");
+await deleteBuildFolder();
+printC("orange", "...Build folder deleted");
 
 // #region Build
 
