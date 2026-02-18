@@ -5,7 +5,11 @@ import * as Context from 'effect/Context';
 import * as Layer from "effect/Layer";
 import * as Config from "effect/Config";
 import * as Cache from "effect/Cache";
-import { Container, CosmosClient, type ItemDefinition } from "@azure/cosmos";
+import { 
+    Container, 
+    CosmosClient as _CosmosClient, 
+    type ItemDefinition 
+} from "@azure/cosmos";
 
 export class CosmosError extends Data.TaggedError("CosmosError")<{
     cause?: unknown;
@@ -16,6 +20,8 @@ export class CosmosConfig extends Context.Tag("effect-services/Cosmos/index/Cosm
     readonly connectionString: Redacted.Redacted<string>;
     readonly databaseID: string;
 }>(){}
+
+// #region Container
 
 interface CosmosContainerImpl {
     use: <T>(
@@ -37,7 +43,7 @@ type ContainerClientArgs = {
 const makeContainer = (
     options: ContainerClientArgs
 ) => Effect.gen(function* () {
-    const client = new CosmosClient(options.connectionString)
+    const client = new _CosmosClient(options.connectionString)
         .database(options.databaseID)
         .container(options.containerID);
 
@@ -70,12 +76,109 @@ export const containerLayer = (
     options: ContainerClientArgs
 ) => Layer.scoped(CosmosContainer, makeContainer(options));
 
+/**
+ * Requires:
+ * 
+ * `Config.string("COSMOS_CONNECTION_STRING");`
+ * 
+ * `Config.string("COSMOS_CONTAINER_ID");`
+ * 
+ * `Config.string("COSMOS_DATABASE_ID");`
+ */
+export const containerFromEnv = Layer.scoped(
+    CosmosContainer,
+    Effect.gen(function* () {
+        const args: ContainerClientArgs = {
+            connectionString: yield* Config.string("COSMOS_CONNECTION_STRING"),
+            containerID: yield* Config.string("COSMOS_CONTAINER_ID"),
+            databaseID: yield* Config.string("COSMOS_DATABASE_ID"),
+        };
+        return yield* makeContainer(args);
+    })
+)
+
+export class CosmosContainerAsCache extends Effect.Service<CosmosContainerAsCache>()("effect-services/Cosmos/index/CosmosContainerAsCache", {
+    dependencies: [containerFromEnv],
+    effect: (
+        options: Omit<Parameters<typeof Cache["make"]>[0], "lookup">
+    ) => Effect.gen(function* () {
+        const container = yield* CosmosContainer;
+        const cache = yield* Cache.make({
+            ...options,
+            lookup: (
+                opts: { id: string; partitionID?: string }
+            ) => container.use((c) => c.item(opts.id, opts.partitionID).read())
+        });
+        return cache;
+    })
+}){}
+
+// #region Client
+
+interface CosmosClientImpl {
+    use: <T>(
+        fn: (client: _CosmosClient) => T
+    ) => Effect.Effect<Awaited<T>, CosmosError, never>
+};
+
+export class CosmosClient extends Context.Tag("effect-services/Cosmos/index/CosmosClient")<
+    CosmosClient, 
+    CosmosClientImpl
+>(){}
+
+const makeClient = (
+    connectionString: string
+) => Effect.gen(function* () {
+    const client = new _CosmosClient(connectionString);
+
+    return CosmosClient.of({
+        use: (fn) => Effect.gen(function* () {
+            const result = yield* Effect.try({
+                try: () => fn(client),
+                catch: (e) => new CosmosError({
+                    cause: e,
+                    message: "Syncronous error in 'CosmosClient.use'"
+                })
+            });
+
+            if (result instanceof Promise) {
+                return yield* Effect.tryPromise({
+                    try: () => result,
+                    catch: (e) => new CosmosError({
+                        cause: e,
+                        message: "Asyncronous error in 'CosmosClient.use'"
+                    })
+                })
+            } else {
+                return result;
+            }
+        })
+    });
+});
+
+export const clientLayer = (
+    connectionString: string,
+) => Layer.scoped(CosmosClient, makeClient(connectionString));
+
+/**
+ * Requires:
+ * 
+ * `Config.string("COSMOS_CONNECTION_STRING")`
+ */
+export const clientFromEnv = Layer.scoped(
+    CosmosClient,
+    Effect.gen(function* () {
+        const connectionStr = yield* Config.string("COSMOS_CONNECTION_STRING");
+        return yield* makeClient(connectionStr);
+    })
+);
+
 export class Cosmos extends Effect.Service<Cosmos>()("Cosmos", {
     effect: Effect.gen(function* () {
         const config = yield* CosmosConfig;
         const conStr = Redacted.value(config.connectionString);
         const dbID = config.databaseID;
-        const client = new CosmosClient(conStr);
+        const client = new _CosmosClient(conStr);
         const _database = client.database(dbID);
 
         const container = (containerName: string) => Effect.gen(function* () {
@@ -126,31 +229,3 @@ export class Cosmos extends Effect.Service<Cosmos>()("Cosmos", {
         } as const;
     }),
 }) {};
-
-export const containerFromEnv = Layer.scoped(
-    CosmosContainer,
-    Effect.gen(function* () {
-        const args: ContainerClientArgs = {
-            connectionString: yield* Config.string("COSMOS_CONNECTION_STRING"),
-            containerID: yield* Config.string("COSMOS_CONTAINER_ID"),
-            databaseID: yield* Config.string("COSMOS_DATABASE_ID"),
-        };
-        return yield* makeContainer(args);
-    })
-)
-
-export class CosmosContainerAsCache extends Effect.Service<CosmosContainerAsCache>()("effect-services/Cosmos/index/CosmosContainerAsCache", {
-    dependencies: [containerFromEnv],
-    effect: (
-        options: Omit<Parameters<typeof Cache["make"]>[0], "lookup">
-    ) => Effect.gen(function* () {
-        const container = yield* CosmosContainer;
-        const cache = yield* Cache.make({
-            ...options,
-            lookup: (
-                opts: { id: string; partitionID?: string }
-            ) => container.use((c) => c.item(opts.id, opts.partitionID).read())
-        });
-        return cache;
-    })
-}){}
