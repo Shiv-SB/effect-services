@@ -7,6 +7,7 @@ import * as Context from "effect/Context";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as HashSet from "effect/HashSet";
 
 export class KeyVaultError extends Data.TaggedError("KeyVaultError")<{
     cause?: unknown;
@@ -92,3 +93,33 @@ export class KeyVaultAsCache extends Effect.Service<KeyVaultAsCache>()("effect-s
         return cache;
     })
 }) { }
+
+// #region ConfigProvider
+
+export const makeAzureKvProvider = (
+    options: SecretClientArgs
+): ConfigProvider.ConfigProvider => {
+    const client = new SecretClient(
+        options.vaultURL,
+        options.credential,
+        options.pipelineOptions
+    );
+
+    return ConfigProvider.fromFlat(
+        ConfigProvider.makeFlat({
+            // @ts-ignore Using generic breaks the below args for some reason
+            load: <A>(path, _conf, _split) => Effect.tryPromise({
+                try: async () => {
+                    const secretName = path.join("--");
+                    const secret = await client.getSecret(secretName);
+                    return [secret.value ?? ""] as A[];
+                },
+                catch: (_e) => [] as A[]
+            }).pipe(Effect.orElseSucceed(() => [] as A[])),
+            enumerateChildren: (_path) => Effect.succeed(HashSet.empty()),
+            patch: {
+                _tag: "Empty"
+            }
+        })
+    );
+}
