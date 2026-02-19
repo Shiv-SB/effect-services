@@ -27,11 +27,17 @@
     "@azure/keyvault-secrets": "^4.10.0",
     "@microsoft/microsoft-graph-client": "^3.0.7"
   },
-  "files": ["build"],
+  "files": [
+    "build"
+  ],
   "exports": {
     "./imanage": {
       "types": "./build/imanage/index.d.ts",
       "import": "./build/imanage/index.js"
+    },
+    "./freshservice": {
+      "types": "./build/freshservice/index.d.ts",
+      "import": "./build/freshservice/index.js"
     },
     "./keyvault": {
       "types": "./build/keyvault/index.d.ts",
