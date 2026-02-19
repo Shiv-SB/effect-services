@@ -1,6 +1,6 @@
 {
   "name": "effect-services",
-  "version": "1.3.1",
+  "version": "1.3.2",
   "module": "index.ts",
   "types": "index.d.ts",
   "type": "module",
@@ -32,24 +32,24 @@
   ],
   "exports": {
     "./imanage": {
-      "types": "./build/imanage/index.d.ts",
-      "import": "./build/imanage/index.js"
+      "types": "./build/Imanage/index.d.ts",
+      "import": "./build/Imanage/index.js"
     },
     "./freshservice": {
-      "types": "./build/freshservice/index.d.ts",
-      "import": "./build/freshservice/index.js"
+      "types": "./build/FreshService/index.d.ts",
+      "import": "./build/FreshService/index.js"
     },
     "./keyvault": {
-      "types": "./build/keyvault/index.d.ts",
-      "import": "./build/keyvault/index.js"
+      "types": "./build/KeyVault/index.d.ts",
+      "import": "./build/KeyVault/index.js"
     },
     "./legl": {
-      "types": "./build/legl/index.d.ts",
-      "import": "./build/legl/index.js"
+      "types": "./build/Legl/index.d.ts",
+      "import": "./build/Legl/index.js"
     },
     "./cosmos": {
-      "types": "./build/cosmos/index.d.ts",
-      "import": "./build/cosmos/index.js"
+      "types": "./build/Cosmos/index.d.ts",
+      "import": "./build/Cosmos/index.js"
     },
     "./msgraph": {
       "types": "./build/MsGraph/index.d.ts",
