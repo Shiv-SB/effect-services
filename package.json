@@ -25,6 +25,7 @@
     "@azure/cosmos": "^4.9.1",
     "@azure/identity": "^4.13.0",
     "@azure/keyvault-secrets": "^4.10.0",
+    "@companieshouse/api-sdk-node": "^2.0.328",
     "@microsoft/microsoft-graph-client": "^3.0.7"
   },
   "files": [
@@ -54,6 +55,10 @@
     "./msgraph": {
       "types": "./build/MsGraph/index.d.ts",
       "import": "./build/MsGraph/index.js"
+    },
+    "./companieshouse": {
+      "types": "./build/companieshouse/index.d.ts",
+      "import": "./build/companieshouse/index.js"
     }
   }
 }
