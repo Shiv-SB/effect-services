@@ -25,6 +25,7 @@
     "@azure/identity": "^4.13.1",
     "@azure/keyvault-secrets": "^4.10.0",
     "@companieshouse/api-sdk-node": "^2.0.329",
+    "@effect/platform": "^0.96.0",
     "@microsoft/microsoft-graph-client": "^3.0.7"
   },
   "files": [
