@@ -104,7 +104,7 @@ export const fromEnv = Layer.scoped(
 
 export const PaginationFields = S.Struct({
     "@odata.context": S.URL,
-    "@odata.nextLink": S.URL,
+    "@odata.nextLink": S.optional(S.URL), // doesnt exist on last page
     value: S.Array(S.Unknown),
 });
 
@@ -125,6 +125,10 @@ export const makeStream = (
         const decoded = decode(response);
 
         if (Either.isLeft(decoded)) {
+            yield* Effect.log("Is left reached", decoded.left, response);
+            // found the error!
+            // nextLink doesnt exist in response but response still contains records.
+            // We exit early so the last page never gets emmited to the stream
             return [
                 [],
                 Option.none()
@@ -132,11 +136,13 @@ export const makeStream = (
         }
 
         const nextLink = decoded.right["@odata.nextLink"];
-        const next = yield* graph.use((c) => c.api(nextLink.href));
+        const next = nextLink
+            ? Option.some(yield* graph.use((c) => c.api(nextLink.href)))
+            : Option.none();
 
         return [
             decoded.right.value,
-            Option.some(next),
+            next
         ];
     })).pipe(Stream.mapConcat((x) => x.flat()));
 
