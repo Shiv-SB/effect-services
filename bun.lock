@@ -18,7 +18,7 @@
         "ts-humanize": "^1.0.2",
       },
       "peerDependencies": {
-        "effect": "^3.19.16",
+        "effect": "^3.20.0",
         "typescript": "^5",
       },
     },
