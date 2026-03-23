@@ -18,7 +18,7 @@
   },
   "peerDependencies": {
     "typescript": "^5.9.3",
-    "effect": "^3.19.18"
+    "effect": "^3.21.0"
   },
   "dependencies": {
     "@azure/cosmos": "^4.9.2",
