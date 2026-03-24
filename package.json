@@ -12,8 +12,10 @@
     "url": "https://github.com/Shiv-SB/effect-services"
   },
   "devDependencies": {
+    "@effect/experimental": "^0.58.0",
     "@effect/language-service": "^0.73.1",
     "@types/bun": "latest",
+    "@types/mssql": "^9.1.9",
     "ts-humanize": "^1.0.2"
   },
   "peerDependencies": {
@@ -24,9 +26,9 @@
     "@azure/cosmos": "^4.9.2",
     "@azure/identity": "^4.13.1",
     "@azure/keyvault-secrets": "^4.10.0",
-    "@companieshouse/api-sdk-node": "^2.0.329",
-    "@effect/platform": "^0.96.0",
-    "@microsoft/microsoft-graph-client": "^3.0.7"
+    "@companieshouse/api-sdk-node": "^2.0.328",
+    "@microsoft/microsoft-graph-client": "^3.0.7",
+    "mssql": "^12.2.1"
   },
   "files": [
     "build"
@@ -59,6 +61,10 @@
     "./companieshouse": {
       "types": "./build/companieshouse/index.d.ts",
       "import": "./build/companieshouse/index.js"
+    },
+    "./mssql": {
+      "types": "./build/mssql/index.d.ts",
+      "import": "./build/mssql/index.js"
     }
   }
 }
