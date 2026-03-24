@@ -1,6 +1,7 @@
 import { bytes, commify } from "ts-humanize";
 import path from "node:path";
 import fs from "node:fs/promises";
+import pkg from "../package.json";
 
 // # region Utils
 
@@ -38,9 +39,63 @@ function getAllIndexFiles(): string[] {
     return files;
 }
 
+const allIndexFiles: string[] = getAllIndexFiles();
+
 async function deleteBuildFolder() {
     await fs.rm("build", { recursive: true, force: true });
 }
+
+// #region Package.json
+
+function getPkgExports(): string[] {
+    const pkgExports = pkg.exports;
+    const keys = Object.keys(pkgExports);
+    const folderNames: string[] = [];
+
+    for (const key of keys) {
+        const folderName = key.substring(2).toLowerCase();
+        folderNames.push(folderName);
+    }
+
+    return folderNames;
+}
+
+function checkPkgFile() {
+    const exports = new Set(getPkgExports());
+    printC("cyan", "Detected exports in package.json:");
+    exports.forEach((f) => console.log("  ", f));
+
+    const entrypoints = new Set(allIndexFiles.map(
+        (f) => path.basename(path.dirname(f))
+    ));
+
+    const entryLen = entrypoints.size;
+    const expLen = exports.size;
+
+    if (entryLen !== expLen) {
+        console.error("Number of detected entrypoints does not match number of detected outputs");
+
+        if (expLen < entryLen) {
+            console.error("Package.json is missing exports for:");
+            const invalidExports = exports.difference(entrypoints);
+            const diff = entrypoints.difference(exports);
+
+            diff.forEach((f) => console.error(` > ${f}`));
+
+            if (invalidExports.size) {
+                console.error("Detected invalid exports in package.json:")
+                invalidExports.forEach((f) => console.error(` > ${f}`));
+            }
+        } else {
+            console.error(`Expected ${entryLen} exports. Recieved: ${expLen}`);
+        }
+
+        console.error("Exiting build script...")
+        process.exit(1);
+    }    
+}
+
+checkPkgFile();
 
 // #region Delete
 
@@ -53,7 +108,7 @@ printC("orange", "...Build folder deleted");
 const start = performance.now();
 
 const build = await Bun.build({
-    entrypoints: getAllIndexFiles(),
+    entrypoints: allIndexFiles,
     metafile: true,
     minify: true,
     outdir: "build",

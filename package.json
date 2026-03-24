@@ -61,6 +61,10 @@
     "./companieshouse": {
       "types": "./build/companieshouse/index.d.ts",
       "import": "./build/companieshouse/index.js"
+    },
+    "./mssql": {
+      "types": "./build/mssql/index.d.ts",
+      "import": "./build/mssql/index.js"
     }
   }
 }
