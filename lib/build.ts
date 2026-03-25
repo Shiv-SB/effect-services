@@ -110,7 +110,7 @@ const start = performance.now();
 const build = await Bun.build({
     entrypoints: allIndexFiles,
     metafile: true,
-    minify: true,
+    minify: false,
     outdir: "build",
     splitting: true,
     sourcemap: "none",
