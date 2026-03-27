@@ -5,21 +5,24 @@ import * as Context from 'effect/Context';
 import * as Layer from "effect/Layer";
 import * as Config from "effect/Config";
 import * as Cache from "effect/Cache";
-import { 
-    Container, 
-    CosmosClient as _CosmosClient, 
-    type ItemDefinition 
+import * as Schedule from "effect/Schedule";
+import * as Duration from "effect/Duration";
+import {
+    Container,
+    ErrorResponse,
+    CosmosClient as _CosmosClient,
+    type ItemDefinition,
 } from "@azure/cosmos";
 
 export class CosmosError extends Data.TaggedError("CosmosError")<{
     cause?: unknown;
     message: string;
-}> {}
+}> { }
 
 export class CosmosConfig extends Context.Tag("effect-services/Cosmos/index/CosmosConfig")<CosmosConfig, {
     readonly connectionString: Redacted.Redacted<string>;
     readonly databaseID: string;
-}>(){}
+}>() { }
 
 // #region Container
 
@@ -30,9 +33,9 @@ interface CosmosContainerImpl {
 };
 
 export class CosmosContainer extends Context.Tag("effect-services/Cosmos/index/CosmosContainer")<
-    CosmosContainer, 
+    CosmosContainer,
     CosmosContainerImpl
->(){}
+>() { }
 
 type ContainerClientArgs = {
     connectionString: string;
@@ -111,7 +114,7 @@ export class CosmosContainerAsCache extends Effect.Service<CosmosContainerAsCach
         });
         return cache;
     })
-}){}
+}) { }
 
 // #region Client
 
@@ -122,9 +125,9 @@ interface CosmosClientImpl {
 };
 
 export class CosmosClient extends Context.Tag("effect-services/Cosmos/index/CosmosClient")<
-    CosmosClient, 
+    CosmosClient,
     CosmosClientImpl
->(){}
+>() { }
 
 const makeClient = (
     connectionString: string
@@ -171,6 +174,34 @@ export const clientFromEnv = Layer.scoped(
         const connectionStr = yield* Config.string("COSMOS_CONNECTION_STRING");
         return yield* makeClient(connectionStr);
     })
+);
+
+/**
+ * A rate limit policy for Cosmos Effects which include
+ * `ComsosError` in the error return
+ * 
+ * By default will retry a maximum of 3 times.
+ * 
+ * To use, pipe with `Effect.retry`
+ * 
+ * @example
+ * 
+ * const result = yield* upsert(record).pipe(
+ *     Effect.retry(RetryPolicy({ maxAttempts: 1 }))
+ * );
+ */
+export const RetryPolicy = (opts?: {
+    maxAttempts?: number
+}) => Schedule.identity<CosmosError>().pipe(
+    Schedule.addDelay((e) => {
+        if (e.cause instanceof ErrorResponse) {
+            if (e.cause.retryAfterInMs) {
+                return Duration.millis(e.cause.retryAfterInMs);
+            }
+        }
+        return Duration.zero;
+    }),
+    Schedule.intersect(Schedule.recurs(opts?.maxAttempts ?? 3))
 );
 
 export class Cosmos extends Effect.Service<Cosmos>()("Cosmos", {
@@ -228,4 +259,4 @@ export class Cosmos extends Effect.Service<Cosmos>()("Cosmos", {
             checkConnection,
         } as const;
     }),
-}) {};
+}) { };
