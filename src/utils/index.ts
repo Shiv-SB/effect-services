@@ -5,13 +5,9 @@ import { Logger, ParseResult, Schedule } from "effect";
 
 type CronPair = [Cron.Cron, Cron.Cron];
 type ScheduleMapping<T extends string> = Record<T, Cron.Cron | CronPair[]>;
-type ComposerOpts = {
-    disableLogging?: boolean;
-};
 
-export const ScheduleComposer = <T extends string>(
+export const ScheduleCronComposer = <T extends string>(
     scheduleMapping: ScheduleMapping<T>,
-    opts?: ComposerOpts,
 ) => Effect.gen(function* () {
     const args = Bun.argv.slice(2);
     const names = Object.keys(scheduleMapping) as T[];
@@ -131,19 +127,23 @@ export const ScheduleComposer = <T extends string>(
         } else if (schedule === Schedule.once) {
             mode = "RUN ONCE (immediate)";
         } else {
-            mode = "Default Cron";
+            const cron = scheduleMapping[name];
+            if (!Array.isArray(cron)) {   
+                const next = Cron.next(cron).toLocaleString();
+                mode = `Default Cron (Next run: ${next})`;
+            } else {
+                mode = `Default Cron (Combined ${cron.length * 2} schedules)`;
+            }
         }
-
         yield* Effect.log(`${name}: ${mode}`);
     }
-
     return schedules;
 }).pipe(
-    Effect.withLogSpan("Schedule Composer")
+    Effect.withLogSpan("Schedule Composer"),
 );
 
-const Test = Effect.gen(function* () {
-    const schedules = yield* ScheduleComposer({
+Effect.gen(function* () {
+    const schedules = yield* ScheduleCronComposer({
         users: [[Cron.unsafeParse("5 4 * * *"), Cron.unsafeParse("0 23 * * *")]],
         sessions: [
             [Cron.unsafeParse("5 4 * * *"), Cron.unsafeParse("0 * * * *")],
@@ -151,7 +151,9 @@ const Test = Effect.gen(function* () {
         ],
         offices: Cron.unsafeParse("0 0 * 4 *"),
     });
+    const users = schedules.users;
 }).pipe(
     Effect.provide(Logger.pretty),
     Effect.runPromise,
 );
+
