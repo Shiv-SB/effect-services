@@ -5,25 +5,25 @@ import * as Either from "effect/Either";
 import * as Data from "effect/Data";
 import * as Schedule from "effect/Schedule";
 import * as ParseResult from "effect/ParseResult";
+import { Logger } from "effect";
 
 // TODO: 
 // Refactor to accept any number of Crons instead of tuple pair
 
-type CronPair = [Cron.Cron, Cron.Cron];
 // We use this type for the function arg instead of
 // the Type constructed from the schema below because
 // this one is slightly better for readability.
 // They are functionaly the same types otherwise.
-type ScheduleMapping<T extends string> = Record<T, Cron.Cron | CronPair[]>;
+type ScheduleMapping<T extends string> = Record<T, Cron.Cron | Cron.Cron[]>;
 
 const CronSchema = S.declare(
-  (input: unknown): input is Cron.Cron => Cron.isCron(input)
+    (input: unknown): input is Cron.Cron => Cron.isCron(input)
 ).annotations({
     message: (_issue) => `Expected type Cron.Cron`
 });
 
 const CronSchemas = S.Union(
-    S.Array(S.Tuple(CronSchema, CronSchema)),
+    S.Array(CronSchema),
     CronSchema,
 ).annotations({
     identifier: "Cron or Cron Tuple"
@@ -104,29 +104,32 @@ export const ScheduleCronComposer = <T extends string>(
         Effect.mapError((e) => new ScheduleCronComposerError({ cause: e, reason: "UNREACHABLE" }))
     )) as Record<AllowedArgs, boolean | undefined>;
 
+    // #region Merge Schedules
+
     const defaultSchedules = {} as Record<T, Schedule.Schedule<unknown>>;
+    const nextMappings: Map<T, Date[]> = new Map();
 
     for (const name of names) {
         const rawSchedule = scheduleMapping[name];
+        const nextArr: Date[] = [];
         if (Array.isArray(rawSchedule)) {
-            let endSchedule: Schedule.Schedule<unknown>;
-            endSchedule = Schedule.union(
-                Schedule.cron(rawSchedule[0]![0]),
-                Schedule.cron(rawSchedule[0]![1])
-            );
-
-            for (let i = 0; i < rawSchedule.length - 1; i++) {
-                const cronPair = rawSchedule[i]!;
-                const union = Schedule.union(
-                    Schedule.cron(cronPair[0]),
-                    Schedule.cron(cronPair[1]),
-                );
-                endSchedule = Schedule.union(endSchedule, union);
-            }
-
-            defaultSchedules[name] = endSchedule;
+            const len = rawSchedule.length;
+                let merged: Schedule.Schedule<unknown> = Schedule.cron(rawSchedule[0]!);
+                for (let i = 0; i < len; i++) {
+                    const curr = rawSchedule[i]!;
+                    const next = Cron.next(curr);
+                    nextArr.push(next);
+                    if (len === 1) {
+                        defaultSchedules[name] = Schedule.cron(rawSchedule[0]!);
+                        break;
+                    }
+                    merged = Schedule.union(merged, Schedule.cron(curr));
+                }
+                defaultSchedules[name] = merged;
+                nextMappings.set(name, nextArr);
         } else {
             defaultSchedules[name] = Schedule.cron(rawSchedule);
+            nextMappings.set(name, [Cron.next(rawSchedule)]);
         }
     }
 
@@ -175,12 +178,14 @@ export const ScheduleCronComposer = <T extends string>(
         } else if (schedule === Schedule.once) {
             mode = "RUN ONCE (immediate)";
         } else {
-            const cron = scheduleMapping[name];
-            if (!Array.isArray(cron)) {
-                const next = Cron.next(cron).toLocaleString();
-                mode = `Default Cron (Next run: ${next})`;
+            const cron = nextMappings.get(name)!;
+            const sorted = cron.toSorted((a, b) => a.getTime() - b.getTime());
+            const firstRun = sorted[0]!.toLocaleString();
+            // length check because if arr len == 1 then its a overly verbose for no benifit.
+            if (Array.isArray(scheduleMapping[name]) && scheduleMapping[name].length > 1) {
+                mode = `Default Cron (Combined ${cron.length} schedules). Next run: ${firstRun}`;
             } else {
-                mode = `Default Cron (Combined ${cron.length * 2} schedules)`;
+                mode = `Default Cron (Next run: ${firstRun})`;
             }
         }
         yield* Effect.log(`${name}: ${mode}`);
@@ -189,19 +194,20 @@ export const ScheduleCronComposer = <T extends string>(
 }).pipe(
     Effect.withLogSpan("Schedule Composer"),
 );
-/*
+
 Effect.gen(function* () {
     const schedules = yield* ScheduleCronComposer({
-        users: [[Cron.unsafeParse("5 4 * * *"), Cron.unsafeParse("0 23 * * *")]],
+        users: [Cron.unsafeParse("5 4 * * *"), Cron.unsafeParse("0 23 * * *")],
         sessions: [
-            [Cron.unsafeParse("5 4 * * *"), Cron.unsafeParse("0 * * * *")],
-            [Cron.unsafeParse("15 12 5 * *"), Cron.unsafeParse("0 0 4,7 * 1")],
+            Cron.unsafeParse("5 4 * * *"),
+            Cron.unsafeParse("0 * * * *"),
+            Cron.unsafeParse("15 12 5 * *"),
         ],
         offices: Cron.unsafeParse("0 0 * 4 *"),
+        incidents: [Cron.unsafeParse("0 19 * * 6")],
     });
     const users = schedules.users;
 }).pipe(
     Effect.provide(Logger.pretty),
     Effect.runPromise,
 );
-*/
