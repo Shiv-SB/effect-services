@@ -39,28 +39,28 @@
   ],
   "exports": {
     "./imanage": {
-      "types": "./build/Imanage/index.d.ts",
-      "import": "./build/Imanage/index.js"
+      "types": "./build/imanage/index.d.ts",
+      "import": "./build/imanage/index.js"
     },
     "./freshservice": {
-      "types": "./build/FreshService/index.d.ts",
-      "import": "./build/FreshService/index.js"
+      "types": "./build/freshservice/index.d.ts",
+      "import": "./build/freshservice/index.js"
     },
     "./keyvault": {
-      "types": "./build/KeyVault/index.d.ts",
-      "import": "./build/KeyVault/index.js"
+      "types": "./build/keyvault/index.d.ts",
+      "import": "./build/keyvault/index.js"
     },
     "./legl": {
-      "types": "./build/Legl/index.d.ts",
-      "import": "./build/Legl/index.js"
+      "types": "./build/legl/index.d.ts",
+      "import": "./build/legl/index.js"
     },
     "./cosmos": {
-      "types": "./build/Cosmos/index.d.ts",
-      "import": "./build/Cosmos/index.js"
+      "types": "./build/cosmos/index.d.ts",
+      "import": "./build/cosmos/index.js"
     },
     "./msgraph": {
-      "types": "./build/MsGraph/index.d.ts",
-      "import": "./build/MsGraph/index.js"
+      "types": "./build/msgraph/index.d.ts",
+      "import": "./build/Msgraph/index.js"
     },
     "./companieshouse": {
       "types": "./build/companieshouse/index.d.ts",
