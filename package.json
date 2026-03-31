@@ -1,6 +1,6 @@
 {
   "name": "effect-services",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "module": "index.ts",
   "types": "index.d.ts",
   "type": "module",
@@ -69,6 +69,10 @@
     "./mssql": {
       "types": "./build/mssql/index.d.ts",
       "import": "./build/mssql/index.js"
+    },
+    "./utils": {
+      "types": "./build/utils/index.d.ts",
+      "import": "./build/utils/index.js"
     }
   }
 }

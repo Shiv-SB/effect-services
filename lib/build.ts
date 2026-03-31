@@ -2,6 +2,7 @@ import { bytes, commify } from "ts-humanize";
 import path from "node:path";
 import fs from "node:fs/promises";
 import pkg from "../package.json";
+import { Schema } from "effect";
 
 // # region Utils
 
@@ -29,6 +30,8 @@ function getAllIndexFiles(): string[] {
     const files: string[] = [];
 
     for (const file of glob.scanSync(src)) {
+        if (file.startsWith("utils")) continue;
+        //console.log(" >", file);
         files.push(path.join(src, file));
     }
 
@@ -44,6 +47,24 @@ const allIndexFiles: string[] = getAllIndexFiles();
 async function deleteBuildFolder() {
     await fs.rm("build", { recursive: true, force: true });
 }
+
+function getArgs() {
+    const allowedArgs = [
+        "cicd",
+    ] as const;
+    type Allowed = typeof allowedArgs[number];
+    const ArgsSchema = Schema.Array(Schema.Literal(...allowedArgs));
+    const args = Bun.argv.slice(2);
+    const validated = Schema.decodeUnknownSync(ArgsSchema)(args);
+
+    const result = Object.fromEntries(validated.map((val) => {
+        return [val, true];
+    })) as Record<Allowed, true>;
+
+    return result;
+}
+
+const args = getArgs();
 
 // #region Package.json
 
@@ -91,8 +112,8 @@ function checkPkgFile() {
         }
 
         console.error("Exiting build script...")
-        process.exit(1);
-    }    
+        //process.exit(1);
+    }
 }
 
 checkPkgFile();
@@ -107,8 +128,23 @@ printC("orange", "...Build folder deleted");
 
 const start = performance.now();
 
+console.log("allIndexFiles:", allIndexFiles);
+
+/*
+   src/mssql/index.ts
+   src/companieshouse/index.ts
+   src/imanage/index.ts
+   src/msgraph/index.ts
+   src/utils/index.ts
+   src/cosmos/index.ts
+   src/keyvault/index.ts
+   src/legl/index.ts
+   src/freshservice/index.ts
+*/
+
 const build = await Bun.build({
     entrypoints: allIndexFiles,
+    //entrypoints: ["./src/freshservice", "./src/legl"],
     metafile: true,
     minify: false,
     outdir: "build",
@@ -165,12 +201,12 @@ console.table({
 
 // #region Output Tree
 
-printC("cyan", "\nOutput Dependency Tree (src only):\n");
+if (!args.cicd) printC("cyan", "\nOutput Dependency Tree (src only):\n");
 
 const outputs = meta.outputs;
 
 const entryOutputs = Object.entries(outputs)
-    .filter(([_, o]) => o.entryPoint)
+    .filter(([_, o]) => o.entryPoint && !o.entryPoint.endsWith("/index.js"))
     .map(([p]) => p);
 
 function printOutputTree(
@@ -201,13 +237,15 @@ function printOutputTree(
     }
 }
 
-for (const entry of entryOutputs) {
-    printOutputTree(entry);
+if (!args.cicd) {
+    for (const entry of entryOutputs) {
+        printOutputTree(entry);
+    }
 }
 
 // #region Source Tree
 
-printC("yellow", "\nSource Dependency Tree (src only):\n");
+if (!args.cicd) printC("yellow", "\nSource Dependency Tree (src only):\n");
 
 function printSourceTree(
     file: string,
@@ -235,15 +273,18 @@ function printSourceTree(
     }
 }
 
-for (const entry of entryOutputs) {
-    const entrySource = meta.outputs[entry]!.entryPoint!;
-    if (!isNodeModule(entrySource)) {
-        printSourceTree(entrySource);
+if (!args.cicd) {
+    for (const entry of entryOutputs) {
+        const entrySource = meta.outputs[entry]!.entryPoint!;
+        if (!isNodeModule(entrySource)) {
+            printSourceTree(entrySource);
+        }
     }
 }
 
-// #region Type declarations
 
+// #region Type declarations
+/*
 printC("orange", "\nGenerating .d.ts files...");
 
 const proc = Bun.spawnSync(
@@ -259,3 +300,25 @@ if (proc.success) {
 } else {
     printC("red", "Failed to generate .d.ts file(s).", "error");
 }
+*/
+
+// #region Validate Structure
+
+function validate() {
+    const dir = "./build";
+    const indexGlob = new Bun.Glob("**/index.js");
+    const indexFiles: string[] = [];
+
+    for (const file of indexGlob.scanSync(dir)) {
+        indexFiles.push(file);
+    }
+
+    console.log(entryOutputs);
+    console.log(indexFiles);
+
+    const isEqual = Bun.deepEquals(entryOutputs.toSorted(), indexFiles.toSorted());
+    console.log(entryOutputs.length, indexFiles.length, isEqual);
+
+}
+
+validate(); 
