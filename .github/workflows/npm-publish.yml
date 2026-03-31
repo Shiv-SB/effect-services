@@ -40,7 +40,7 @@ jobs:
         run: bun audit
 
       - name: Build package
-        run: bun run build
+        run: bun build:cicd
 
       - name: Publish to NPM
         # Use NPM instead of bun:

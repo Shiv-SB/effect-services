@@ -8,6 +8,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "build": "bun lib/build",
+    "build:profile": "bun --cpu-prof-md --cpu-prof-dir ./meta lib/build",
+    "build:cicd": "bun lib/build cicd",
     "prepublishOnly": "bun run build"
   },
   "repository": {
