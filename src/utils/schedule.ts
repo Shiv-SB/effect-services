@@ -46,6 +46,8 @@ export const ScheduleCronComposer = <T extends string>(
 ) => Effect.gen(function* () {
     const args = Bun.argv.slice(2);
 
+    // #region Validation
+
     const validate = S.decodeEither(funcArgSchema, { exact: true });
     const validateResult = validate(scheduleMapping);
 
@@ -78,6 +80,8 @@ export const ScheduleCronComposer = <T extends string>(
 
         return S.Struct(resultObj);
     };
+
+    // #region Create Flags
 
     const argArrSchema = S.Array(allowedArgs);
 
@@ -133,6 +137,8 @@ export const ScheduleCronComposer = <T extends string>(
         }
     }
 
+    // #region Set Flags
+
     const isNow = flags.now === true;
     const selectedJobs = names.filter((name) => flags[name]);
     const anyJobFlag = selectedJobs.length > 0;
@@ -167,6 +173,8 @@ export const ScheduleCronComposer = <T extends string>(
         // fallback (should never hit)
         return [name, DontRun];
     })) as Record<T, Schedule.Schedule<unknown, unknown, never>>;
+
+    // #region Log
 
     yield* Effect.log("Composer execution plan:");
     for (const name of names) {
@@ -206,8 +214,9 @@ Effect.gen(function* () {
         offices: Cron.unsafeParse("0 0 * 4 *"),
         incidents: [Cron.unsafeParse("0 19 * * 6")],
     });
-    const users = schedules.users;
+    yield* Effect.log("Users", schedules.users);
 }).pipe(
     Effect.provide(Logger.pretty),
     Effect.runPromise,
 );
+
