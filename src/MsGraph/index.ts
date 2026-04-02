@@ -13,6 +13,7 @@ import { ClientSecretCredential } from "@azure/identity";
 import {
     TokenCredentialAuthenticationProvider
 } from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";
+import { Schedule } from "effect";
 
 export class MsGraphError extends Data.TaggedError("MsGraphError")<{
     cause?: unknown;
@@ -114,28 +115,26 @@ export const makeStream = (
     const graph = yield* MsGraph;
     const decode = S.decodeUnknownEither(PaginationFields);
     const stream = Stream.paginateEffect(request, (req) => Effect.gen(function* () {
-        const response = yield* Effect.tryPromise({
+        const getResponse = Effect.tryPromise({
             try: () => req.get(),
             catch: (e) => new MsGraphError({
                 cause: e,
                 message: "makeStream unable to process given request"
             })
-        });
+        }).pipe(Effect.retry({ times: 3, schedule: Schedule.exponential(1) }));
 
+        const response = yield* getResponse;
         const decoded = decode(response);
 
         if (Either.isLeft(decoded)) {
-            yield* Effect.log("Is left reached", decoded.left, response);
-            // found the error!
-            // nextLink doesnt exist in response but response still contains records.
-            // We exit early so the last page never gets emmited to the stream
+            yield* Effect.logError("MsGraph makeStream recieved unexpected data structure.", decoded.left);
             return [
                 [],
                 Option.none()
             ];
         }
 
-        const nextLink = decoded.right["@odata.nextLink"];
+        const nextLink: URL | undefined = decoded.right["@odata.nextLink"];
         const next = nextLink
             ? Option.some(yield* graph.use((c) => c.api(nextLink.href)))
             : Option.none();
