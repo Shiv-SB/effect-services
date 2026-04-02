@@ -1,7 +1,9 @@
 import { bytes, commify } from "ts-humanize";
 import path from "node:path";
 import fs from "node:fs/promises";
+import * as fsSync from "node:fs";
 import pkg from "../package.json";
+import { Schema } from "effect";
 
 // # region Utils
 
@@ -29,6 +31,7 @@ function getAllIndexFiles(): string[] {
     const files: string[] = [];
 
     for (const file of glob.scanSync(src)) {
+        //console.log(" >", file);
         files.push(path.join(src, file));
     }
 
@@ -44,6 +47,24 @@ const allIndexFiles: string[] = getAllIndexFiles();
 async function deleteBuildFolder() {
     await fs.rm("build", { recursive: true, force: true });
 }
+
+function getArgs() {
+    const allowedArgs = [
+        "cicd",
+    ] as const;
+    type Allowed = typeof allowedArgs[number];
+    const ArgsSchema = Schema.Array(Schema.Literal(...allowedArgs));
+    const args = Bun.argv.slice(2);
+    const validated = Schema.decodeUnknownSync(ArgsSchema)(args);
+
+    const result = Object.fromEntries(validated.map((val) => {
+        return [val, true];
+    })) as Record<Allowed, true>;
+
+    return result;
+}
+
+const args = getArgs();
 
 // #region Package.json
 
@@ -92,7 +113,7 @@ function checkPkgFile() {
 
         console.error("Exiting build script...")
         process.exit(1);
-    }    
+    }
 }
 
 checkPkgFile();
@@ -108,6 +129,7 @@ printC("orange", "...Build folder deleted");
 const start = performance.now();
 
 const build = await Bun.build({
+    root: "./src",
     entrypoints: allIndexFiles,
     metafile: true,
     minify: false,
@@ -126,6 +148,12 @@ if (!build.success) {
 }
 
 printC("chartreuse", "Build success!\n");
+
+if (!args.cicd) {
+    console.log("Saving metafile to disk...");
+    await Bun.write("./meta/metafile.json", JSON.stringify(build.metafile, null, 2));
+    console.log("Metafile saved!");
+}
 
 if (build.logs.length) {
     printC("orange", "Build completed with warnings:");
@@ -165,12 +193,21 @@ console.table({
 
 // #region Output Tree
 
-printC("cyan", "\nOutput Dependency Tree (src only):\n");
+if (!args.cicd) printC("cyan", "\nOutput Dependency Tree (src only):\n");
 
 const outputs = meta.outputs;
 
+
+/**
+ * Index files including parent folder
+ * E.g. `["mssql/index.js", "legl/index.js"]`
+ * 
+ * Generated from metafile exports.
+ *
+ */
 const entryOutputs = Object.entries(outputs)
-    .filter(([_, o]) => o.entryPoint)
+    .filter(([_, o]) => o.entryPoint && !o.entryPoint.endsWith("/index.js"))
+    //.filter(([_, o]) => o.entryPoint)
     .map(([p]) => p);
 
 function printOutputTree(
@@ -201,13 +238,15 @@ function printOutputTree(
     }
 }
 
-for (const entry of entryOutputs) {
-    printOutputTree(entry);
+if (!args.cicd) {
+    for (const entry of entryOutputs) {
+        printOutputTree(entry);
+    }
 }
 
 // #region Source Tree
 
-printC("yellow", "\nSource Dependency Tree (src only):\n");
+if (!args.cicd) printC("yellow", "\nSource Dependency Tree (src only):\n");
 
 function printSourceTree(
     file: string,
@@ -235,12 +274,15 @@ function printSourceTree(
     }
 }
 
-for (const entry of entryOutputs) {
-    const entrySource = meta.outputs[entry]!.entryPoint!;
-    if (!isNodeModule(entrySource)) {
-        printSourceTree(entrySource);
+if (!args.cicd) {
+    for (const entry of entryOutputs) {
+        const entrySource = meta.outputs[entry]!.entryPoint!;
+        if (!isNodeModule(entrySource)) {
+            printSourceTree(entrySource);
+        }
     }
 }
+
 
 // #region Type declarations
 
@@ -259,3 +301,57 @@ if (proc.success) {
 } else {
     printC("red", "Failed to generate .d.ts file(s).", "error");
 }
+
+
+// #region Validate Structure
+
+function validate() {
+    const dir = "./build";
+    const indexGlob = new Bun.Glob("**/index.js");
+    const indexFiles: string[] = [];
+
+    for (const file of indexGlob.scanSync(dir)) {
+        indexFiles.push(file);
+    }
+
+    const isEqual = Bun.deepEquals(entryOutputs.toSorted(), indexFiles.toSorted());
+
+    const entryLen = entryOutputs.length;
+    const indexLen = indexFiles.length;
+
+    const e = new Set(entryOutputs);
+    const i = new Set(indexFiles);
+
+    if (entryLen !== indexLen) {
+        console.error(`Mismatch in build metafile (${entryLen}) and build actual (${indexLen})`);
+
+        const diff = e.difference(i);
+        console.error(
+            "Metafile emmited the following output file(s) which probably shouldnt be here." +
+            "\nCheck for circular dependencies, and ensure that chunks are being filtered out in the build step."
+        );
+        diff.forEach((f) => console.error("  >", f));
+        // Dont exit here. If this case is true then the next case will be too.
+    }
+
+    if (!isEqual) {
+        console.error(
+            "The metafile exports do not match the actial build files." +
+            "\nCheck the above errors for clues.\n"
+        );
+        console.log("metafile outputs:", e);
+        console.log("build index files:", i);
+
+        process.exit(1);
+
+    }
+
+    if (fsSync.existsSync("./build/src")) {
+        console.error(`Detected "src" folder in build. Are circular dependencies not being properly handled?`);
+        process.exit(1);
+    }
+
+    printC("green", "Build dir has correct structure.");
+}
+
+validate(); 

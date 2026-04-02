@@ -1,11 +1,15 @@
 {
   "name": "effect-services",
-  "version": "1.5.2",
+  "version": "1.6.0",
   "module": "index.ts",
   "types": "index.d.ts",
   "type": "module",
   "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
     "build": "bun lib/build",
+    "build:profile": "bun --cpu-prof-md --cpu-prof-dir ./meta lib/build",
+    "build:cicd": "bun lib/build cicd",
     "prepublishOnly": "bun run build"
   },
   "repository": {
@@ -14,6 +18,7 @@
   "devDependencies": {
     "@effect/experimental": "^0.58.0",
     "@effect/language-service": "^0.73.1",
+    "@effect/vitest": "^0.29.0",
     "@types/bun": "latest",
     "@types/mssql": "^9.1.9",
     "ts-humanize": "^1.0.2"
@@ -36,28 +41,28 @@
   ],
   "exports": {
     "./imanage": {
-      "types": "./build/Imanage/index.d.ts",
-      "import": "./build/Imanage/index.js"
+      "types": "./build/imanage/index.d.ts",
+      "import": "./build/imanage/index.js"
     },
     "./freshservice": {
-      "types": "./build/FreshService/index.d.ts",
-      "import": "./build/FreshService/index.js"
+      "types": "./build/freshservice/index.d.ts",
+      "import": "./build/freshservice/index.js"
     },
     "./keyvault": {
-      "types": "./build/KeyVault/index.d.ts",
-      "import": "./build/KeyVault/index.js"
+      "types": "./build/keyvault/index.d.ts",
+      "import": "./build/keyvault/index.js"
     },
     "./legl": {
-      "types": "./build/Legl/index.d.ts",
-      "import": "./build/Legl/index.js"
+      "types": "./build/legl/index.d.ts",
+      "import": "./build/legl/index.js"
     },
     "./cosmos": {
-      "types": "./build/Cosmos/index.d.ts",
-      "import": "./build/Cosmos/index.js"
+      "types": "./build/cosmos/index.d.ts",
+      "import": "./build/cosmos/index.js"
     },
     "./msgraph": {
-      "types": "./build/MsGraph/index.d.ts",
-      "import": "./build/MsGraph/index.js"
+      "types": "./build/msgraph/index.d.ts",
+      "import": "./build/Msgraph/index.js"
     },
     "./companieshouse": {
       "types": "./build/companieshouse/index.d.ts",
@@ -66,6 +71,10 @@
     "./mssql": {
       "types": "./build/mssql/index.d.ts",
       "import": "./build/mssql/index.js"
+    },
+    "./utils": {
+      "types": "./build/utils/index.d.ts",
+      "import": "./build/utils/index.js"
     }
   }
 }
