@@ -348,7 +348,10 @@ function validate() {
 
     if (fsSync.existsSync("./build/src")) {
         console.error(`Detected "src" folder in build. Are circular dependencies not being properly handled?`);
+        process.exit(1);
     }
+
+    printC("green", "Build dir has correct structure.");
 }
 
 validate(); 
