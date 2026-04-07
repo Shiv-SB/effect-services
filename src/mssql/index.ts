@@ -5,7 +5,7 @@ import * as Stream from "effect/Stream";
 import * as Context from "effect/Context";
 import * as Layer from "effect/Layer";
 
-class MsSqlError extends Data.TaggedError("MsSqlError")<{
+export class MsSqlError extends Data.TaggedError("MsSqlError")<{
     message: string;
     cause: unknown;
     reason: "CONNECTION_ERROR" 
