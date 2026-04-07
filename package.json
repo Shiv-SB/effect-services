@@ -18,7 +18,6 @@
   "devDependencies": {
     "@effect/experimental": "^0.58.0",
     "@effect/language-service": "^0.73.1",
-    "@effect/vitest": "^0.29.0",
     "@types/bun": "latest",
     "@types/mssql": "^9.1.9",
     "ts-humanize": "^1.0.2"
