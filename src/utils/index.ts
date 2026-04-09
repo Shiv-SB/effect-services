@@ -35,7 +35,7 @@ const funcArgSchema = S.Record({
     identifier: "ScheduleCronComposer Args",
 });
 
-class ScheduleCronComposerError extends Data.TaggedError("ScheduleCronComposerError")<{
+export class ScheduleCronComposerError extends Data.TaggedError("ScheduleCronComposerError")<{
     cause?: unknown;
     reason: "INVALID_FUNC_ARGS" | "UNREACHABLE";
 }> { }
