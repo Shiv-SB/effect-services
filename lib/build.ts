@@ -85,6 +85,11 @@ function getPkgExports(): string[] {
     return folderNames;
 }
 
+console.log("Entrypoints:");
+for (const f of allIndexFiles) {
+    console.log(" -", f);
+}
+
 function checkPkgFile() {
     const exports = new Set(getPkgExports());
     printC("cyan", "Detected exports in package.json:");
@@ -378,4 +383,27 @@ function validate() {
     printC("green", "Build dir has correct structure.");
 }
 
-validate(); 
+function validateExportsExist() {
+    const rawExports = pkg.exports;
+
+    for (const key of Object.keys(rawExports)) {
+        const exp = rawExports[key as keyof typeof rawExports];
+        const importPath = exp.import;
+        const typesPath = exp.types;
+
+        if (!fsSync.existsSync(importPath)) {
+            console.error(`Missing export target (import): ${key} -> ${importPath}`);
+            process.exit(1);
+        }
+
+        if (!fsSync.existsSync(typesPath)) {
+            console.error(`Missing export target (types): ${key} -> ${typesPath}`);
+            process.exit(1);
+        }
+    }
+
+    printC("green", "All exports map to valid files.");
+}
+
+validate();
+validateExportsExist();
