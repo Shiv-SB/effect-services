@@ -61,7 +61,7 @@
     },
     "./msgraph": {
       "types": "./build/msgraph/index.d.ts",
-      "import": "./build/Msgraph/index.js"
+      "import": "./build/msgraph/index.js"
     },
     "./companieshouse": {
       "types": "./build/companieshouse/index.d.ts",

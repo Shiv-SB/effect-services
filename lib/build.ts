@@ -25,6 +25,10 @@ function isNodeModule(p: string) {
     return normalize(p).includes("node_modules");
 }
 
+function hasUppercase(str: string): boolean {
+    return str !== str.toLowerCase();
+}
+
 function getAllIndexFiles(): string[] {
     const glob = new Bun.Glob("**/index.ts");
     const src = "./src";
@@ -113,6 +117,18 @@ function checkPkgFile() {
 
         console.error("Exiting build script...")
         process.exit(1);
+    }
+
+    const rawExports = pkg.exports;
+    for (const key of Object.keys(rawExports)) {
+        const exportPath = rawExports[key as keyof typeof rawExports];
+        const imp = exportPath.import;
+        const typ = exportPath.types;
+
+        if (hasUppercase(imp) || hasUppercase(typ)) {
+            console.error(`Detected uppercase characters in package json export:`, exportPath);
+            process.exit(1);
+        }
     }
 }
 
@@ -206,7 +222,7 @@ const outputs = meta.outputs;
  *
  */
 const entryOutputs = Object.entries(outputs)
-    .filter(([_, o]) => o.entryPoint && !o.entryPoint.endsWith("/index.js"))
+    .filter(([p, o]) => o.entryPoint && p.endsWith("/index.js"))
     //.filter(([_, o]) => o.entryPoint)
     .map(([p]) => p);
 
@@ -350,6 +366,14 @@ function validate() {
         console.error(`Detected "src" folder in build. Are circular dependencies not being properly handled?`);
         process.exit(1);
     }
+
+    entryOutputs.forEach((filePath) => {
+        const lc = filePath.toLowerCase();
+        if (filePath !== lc) {
+            console.error("All file paths should be lowercase! Detected uppercase chars:", filePath);
+            process.exit(1);
+        }
+    });
 
     printC("green", "Build dir has correct structure.");
 }
