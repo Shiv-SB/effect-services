@@ -47,7 +47,7 @@ export class MsSql extends Effect.Service<MsSql>()("effect-services/mssql/index/
                 reason: "STREAM_ERROR",
             }));
 
-            const runQuery = Effect.tryPromise({
+            const runQuery = Effect.try({
                 try: () => req.query(sqlQuery),
                 catch: (err) => new MsSqlError({
                     cause: err,

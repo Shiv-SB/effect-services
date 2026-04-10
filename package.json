@@ -1,6 +1,6 @@
 {
   "name": "effect-services",
-  "version": "1.6.3",
+  "version": "1.6.4",
   "module": "index.ts",
   "types": "index.d.ts",
   "type": "module",
