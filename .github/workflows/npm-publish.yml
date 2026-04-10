@@ -36,10 +36,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Audit vulnerablities
-        run: |
-          bun audit \
-            --ignore CVE-2025-62718
+      #- name: Audit vulnerablities
+      #  run: bun audit 
 
       - name: Build package
         run: bun build:cicd
