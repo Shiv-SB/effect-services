@@ -38,6 +38,45 @@ type ScheduleCronComposerReturnType<T extends string> = Effect.Effect<
     Record<T, Schedule.Schedule<unknown>>, ScheduleCronComposerError, never
 >
 
+/**
+ * A CLI utility used to compose Cron schedules per job name. 
+ * 
+ * Intended usage: You have a number of jobs which run on Cron Schedules.
+ * In development/testing environments you need to run specific jobs immediately.
+ * 
+ * A single Cron, or an array of Crons can be passed to a job.
+ * If multiple Cron schedules are passed to a job, they will be merged into a single schedule.
+ * 
+ * @example
+ * // index.ts
+ * const Main = Effect.gen(function* () {
+ *  const schedules = yield* ScheduleCronComposer({
+ *      job1: Cron.unsafeParse("0 5 * * *"),
+ *      job2: [Cron.unsafeParse("30 4 * * 4"), Cron.unsafeParse("0 23 * * 1-3")],
+ *      job3: Cron.unsafeParse("* 12 * * *"),
+ *  });
+ * 
+ *  const job1 = Effect.succeed("foo!").pipe(Effect.schedule(schedules.job1));
+ *  const job2 = Effect.succeed("bar!").pipe(Effect.schedule(schedules.job2));
+ * 
+ *  // Common pitfall - Set concurrency to unbounded, otherwise only the first job will ever run!
+ *  yield* Effect.all([job1, job2], { concurrency: "unbounded" });
+ * }).pipe(Effect.runPromise);
+ * 
+ * // CLI usage:
+ * 
+ * // To run all jobs with their default provided schedules:
+ * $ bun index
+ * 
+ * // To run only job1 on its provided schedule:
+ * $ bun index -c job1
+ * 
+ * // To run only job1 and job2, but immediately and only once:
+ * $ bun index -c job1 job2 --now
+ * 
+ * // To run all jobs immediately and only once:
+ * $ bun index -c --now
+ */
 export const ScheduleCronComposer = <T extends string>(
     scheduleMapping: ScheduleMapping<T>,
     flag: `-${string}` = "-c",
