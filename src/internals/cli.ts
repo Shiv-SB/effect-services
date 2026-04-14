@@ -1,7 +1,7 @@
 import { Data, Effect, Logger, Option, pipe } from "effect";
 import * as S from "effect/Schema";
 
-class ValidatorError extends Data.TaggedError("ValidatorError")<{
+export class ValidatorError extends Data.TaggedError("ValidatorError")<{
     message: string;
     reason: "INVALID_FUNC_ARGS" | "INVALID_CLI_ARGS";
     cause?: unknown;
@@ -13,9 +13,9 @@ type ValidatorOpts<A extends string, L extends string> = {
     longFlags?: L[], // cannot validate long flags with schema; would overlap with other args
 }
 
-const Validator = <A extends string, L extends string>(
+export const Validator = <A extends string, L extends string>(
     opts: ValidatorOpts<A, L>
-) => Effect.gen(function* () {
+): Effect.Effect<Option.Option<{ args: A[], longFlags: L[]}>, ValidatorError> => Effect.gen(function* () {
     const {
         shortFlag,
         allowedArgs,
