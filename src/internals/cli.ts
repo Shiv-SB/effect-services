@@ -1,11 +1,14 @@
-import { Data, Effect, Logger, Option, pipe } from "effect";
 import * as S from "effect/Schema";
+import * as Data from "effect/Data";
+import * as Effect from "effect/Effect";
 
 export class ValidatorError extends Data.TaggedError("ValidatorError")<{
     message: string;
     reason: "INVALID_FUNC_ARGS" | "INVALID_CLI_ARGS";
     cause?: unknown;
 }> { }
+
+const CLI_VERSION = "1.0.0";
 
 type ValidatorOpts<A extends string, L extends string> = {
     shortFlag: `-${string}`,
@@ -15,17 +18,24 @@ type ValidatorOpts<A extends string, L extends string> = {
 
 export const Validator = <A extends string, L extends string>(
     opts: ValidatorOpts<A, L>
-): Effect.Effect<Option.Option<{ args: A[], longFlags: L[]}>, ValidatorError> => Effect.gen(function* () {
+): Effect.Effect<{
+    args: A[];
+    longFlags: L[];
+}, ValidatorError, never> => Effect.gen(function* () {
     const {
         shortFlag,
         allowedArgs,
         longFlags = [],
     } = opts;
+
     const allowedArgsSchema = S.Array(S.Literal(...allowedArgs))
         .pipe(S.mutable)
         .annotations({ identifier: "Allowed Arguments" });
 
     const args = Bun.argv.slice(2);
+
+    const defaultLongFlags = ["help", "version"] as const;
+    type DLF = typeof defaultLongFlags[number]; 
 
     const collectedArgs: A[] = [];
     const collectedLongFlags: L[] = [];
@@ -40,7 +50,7 @@ export const Validator = <A extends string, L extends string>(
         if (arg.startsWith("-")) {
             if (arg.startsWith("--")) {
                 const flag = arg.slice(2) as L;
-                if (collecting && (longFlags.includes(flag) || flag === "help")) {
+                if (collecting && (longFlags.includes(flag) || defaultLongFlags.includes(flag as DLF))) {
                     collectedLongFlags.push(flag);
                 } else {
                     collecting = false;
@@ -77,7 +87,12 @@ export const Validator = <A extends string, L extends string>(
             $ bun file.ts --help
         `;
         yield* Effect.log(helpText);
-        return Option.none();
+        process.exit(0);
+    }
+
+    if (collectedLongFlags.includes("version" as L)) {
+        yield* Effect.log(CLI_VERSION);
+        process.exit(0);
     }
 
     const result = S.decodeUnknownEither(allowedArgsSchema)(collectedArgs);
@@ -90,10 +105,10 @@ export const Validator = <A extends string, L extends string>(
         });
     }
 
-    return Option.some({ args: result.right, longFlags: collectedLongFlags });
+    return { args: result.right, longFlags: collectedLongFlags };
 });
 
-const Test = Effect.gen(function* () {
+/*const Test = Effect.gen(function* () {
     const result = yield* Validator({
         shortFlag: "-c",
         allowedArgs: ["users", "sessions"],
@@ -107,4 +122,4 @@ pipe(
     Test,
     Effect.provide(Logger.pretty),
     Effect.runPromise,
-)
+)*/
