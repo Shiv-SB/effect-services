@@ -5,20 +5,29 @@ class ValidatorError extends Data.TaggedError("ValidatorError")<{
     message: string;
     reason: "INVALID_FUNC_ARGS" | "INVALID_CLI_ARGS";
     cause?: unknown;
-}>{}
+}> { }
 
-const Validator = <T extends string, L extends string>(
+type ValidatorOpts<A extends string, L extends string> = {
     shortFlag: `-${string}`,
-    allowedArgs: T[],
-    longFlags: L[], // cannot validate long flags with schema; would overlap with other args
+    allowedArgs: A[],
+    longFlags?: L[], // cannot validate long flags with schema; would overlap with other args
+}
+
+const Validator = <A extends string, L extends string>(
+    opts: ValidatorOpts<A, L>
 ) => Effect.gen(function* () {
-    const allowedArgsSchema = S.Array(S.Literal(...allowedArgs)).annotations({
-        title: "Allowed Arguments",
-    });
+    const {
+        shortFlag,
+        allowedArgs,
+        longFlags = [],
+    } = opts;
+    const allowedArgsSchema = S.Array(S.Literal(...allowedArgs))
+        .pipe(S.mutable)
+        .annotations({ identifier: "Allowed Arguments" });
 
     const args = Bun.argv.slice(2);
 
-    const outputs: T[] = [];
+    const collectedArgs: A[] = [];
     const collectedLongFlags: L[] = [];
     let collecting = false;
 
@@ -46,25 +55,21 @@ const Validator = <T extends string, L extends string>(
             continue;
         }
 
-        outputs.push(arg as T);
+        collectedArgs.push(arg as A);
     }
 
-    console.log(collectedLongFlags);
-
     if (collectedLongFlags.includes("help" as L)) {
-        const helpText = 
-        `
+        const helpText =
+            `
         allowed short flag: ${shortFlag}
-        allowed argument(s) for short flag: ${
-            allowedArgs
+        allowed argument(s) for short flag: ${allowedArgs
                 .map((x) => `'${x}'`)
                 .join(", ")
-        }
-        allowed long flag(s): ${
-            longFlags
+            }
+        allowed long flag(s): ${longFlags
                 .map((x) => `'${x}'`)
                 .join(", ")
-        }
+            }
 
         Example usages:
             $ bun file.ts ${shortFlag} ${allowedArgs[0]}
@@ -75,18 +80,25 @@ const Validator = <T extends string, L extends string>(
         return Option.none();
     }
 
-    yield* S.decodeUnknown(allowedArgsSchema)(outputs);
+    const result = S.decodeUnknownEither(allowedArgsSchema)(collectedArgs);
 
-    return Option.some({ args: outputs, longFlags: collectedLongFlags });
+
+    if (result._tag === "Left") {
+        return yield* new ValidatorError({
+            message: result.left.message,
+            reason: "INVALID_CLI_ARGS",
+        });
+    }
+
+    return Option.some({ args: result.right, longFlags: collectedLongFlags });
 });
 
 const Test = Effect.gen(function* () {
-    const result = yield* Validator("-c", [
-        "users",
-        "sessions",
-    ], [
-        "now"
-    ]);
+    const result = yield* Validator({
+        shortFlag: "-c",
+        allowedArgs: ["users", "sessions"],
+        longFlags: ["now"],
+    });
 
     yield* Effect.log(result);
 });
