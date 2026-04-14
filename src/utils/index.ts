@@ -6,15 +6,6 @@ import * as Data from "effect/Data";
 import * as Schedule from "effect/Schedule";
 import * as ParseResult from "effect/ParseResult";
 
-// TODO: 
-// Refactor to accept any number of Crons instead of tuple pair
-
-// We use this type for the function arg instead of
-// the Type constructed from the schema below because
-// this one is slightly better for readability.
-// They are functionaly the same types otherwise.
-type ScheduleMapping<T extends string> = Record<T, Cron.Cron | Cron.Cron[]>;
-
 const CronSchema = S.declare(
     (input: unknown): input is Cron.Cron => Cron.isCron(input)
 ).annotations({
@@ -24,7 +15,8 @@ const CronSchema = S.declare(
 const CronSchemas = S.Union(
     S.Array(CronSchema),
     CronSchema,
-).annotations({
+).pipe(S.mutable)
+.annotations({
     identifier: "Cron or Cron Tuple"
 });
 
@@ -34,6 +26,8 @@ const funcArgSchema = S.Record({
 }).annotations({
     identifier: "ScheduleCronComposer Args",
 });
+
+type ScheduleMapping<T extends string> = Record<T, typeof CronSchemas.Type>;
 
 export class ScheduleCronComposerError extends Data.TaggedError("ScheduleCronComposerError")<{
     cause?: unknown;
@@ -97,7 +91,7 @@ export const ScheduleCronComposer = <T extends string>(
                 return ParseResult.succeed(result);
             },
             encode: (target, _, ast) => ParseResult.fail(new ParseResult.Forbidden(
-                ast, target, "TODO"
+                ast, target, "Unreachable"
             ))
         }
     );
