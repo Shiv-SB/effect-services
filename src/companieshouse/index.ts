@@ -9,6 +9,7 @@ import type ApiClient from "@companieshouse/api-sdk-node/dist/client";
 import { createApiClient } from "@companieshouse/api-sdk-node";
 import { FetchHttpClient, HttpClient, HttpClientResponse } from '@effect/platform';
 import type { HttpClientError } from "@effect/platform/HttpClientError";
+import { Logger } from "effect";
 
 export class CompaniesHouseError extends Data.TaggedError("CompaniesHouseError")<{
     cause?: unknown;
@@ -21,116 +22,61 @@ interface CompaniesHouseImpl {
     ) => Effect.Effect<Awaited<T>, CompaniesHouseError, never>
 };
 
-export class CompaniesHouse extends Context.Tag("effect-services/companieshouse/index/CompaniesHouse")<
-    CompaniesHouse,
-    CompaniesHouseImpl
->() { }
-
-interface CompaniesHouseArgs {
-    apiKey?: string;
-    oauthToken?: string;
-    baseUrl?: string;
-    baseAccountUrl?: string;
+interface ConfigOpts {
+    apiKey: string;
 }
 
-export const make = (
-    options: CompaniesHouseArgs
-) => Effect.gen(function* () {
-    const client = createApiClient(
-        options.apiKey,
-        options.oauthToken,
-        options.baseUrl,
-        options.baseAccountUrl
-    );
+class Config extends Context.Service<Config, ConfigOpts>()("Config") { }
 
-    return CompaniesHouse.of({
-        use: (fn) => Effect.gen(function* () {
-            const result = yield* Effect.try({
-                try: () => fn(client),
-                catch: (e) => new CompaniesHouseError({
-                    cause: e,
-                    message: "Syncronous error in 'CompaniesHouse.use'"
-                })
-            });
+const ConfigLayer = (opts: ConfigOpts) => Layer.succeed(Config, opts);
 
-            if (result instanceof Promise) {
-                return yield* Effect.tryPromise({
-                    try: () => result,
+class CompaniesHouse extends Context.Service<CompaniesHouse>()("CompaniesHouse", {
+    make: Effect.gen(function* () {
+        const c = yield* Config;
+        const _client = createApiClient(c.apiKey);
+
+        const caller: CompaniesHouseImpl = {
+            use: (fn) => Effect.gen(function* () {
+                const result = yield* Effect.try({
+                    try: () => fn(_client),
                     catch: (e) => new CompaniesHouseError({
                         cause: e,
-                        message: "Asyncronous error in 'CompaniesHouse.use'"
+                        message: "Syncronous error in 'CompaniesHouse.use'"
                     })
                 });
-            } else {
-                return result;
-            }
-        })
-    })
-});
 
-export const layer = (
-    options: CompaniesHouseArgs
-) => Layer.scoped(CompaniesHouse, make(options));
-
-/*
-    "x-ratelimit-limit": "600",
-    "x-ratelimit-remain": "387",
-    "x-ratelimit-reset": "1772723332", seconds unix time till reset
-    "x-ratelimit-window": "5m",
-*/
-export const RetryPolicy = Schedule.identity<HttpClientError>().pipe(
-    Schedule.addDelayEffect((err) => Effect.gen(function* () {
-        if (err._tag === "ResponseError" && err.response.status === 429) {
-            const resetHeader = err.response.headers["x-ratelimit-reset"]!;
-            const timestamp = DateTime.unsafeMake(parseInt(resetHeader, 10) * 1000);
-            const now = yield* DateTime.now;
-            const diffMs = DateTime.distance(now, timestamp);
-            yield* Effect.logWarning(`Rate limited. Waiting until ${DateTime.formatIso(timestamp)} (${Duration.format(diffMs)})`);
-            return Duration.millis(diffMs);
+                if (result instanceof Promise) {
+                    return yield* Effect.tryPromise({
+                        try: () => result,
+                        catch: (e) => new CompaniesHouseError({
+                            cause: e,
+                            message: "Asyncronous error in 'CompaniesHouse.use'"
+                        })
+                    });
+                } else {
+                    return result;
+                }
+            })
         }
-        return Duration.zero;
-    }))
+
+        return caller;
+    }),
+}) {
+    static readonly layer = (opts: ConfigOpts) => Layer.effect(this, this.make).pipe(
+        Layer.provide(ConfigLayer(opts))
+    )
+}
+
+/*const Test = Effect.gen(function* () {
+    const ch = yield* CompaniesHouse;
+    const foo = yield* CompaniesHouse.use((c) => c.use((c) => c.companyProfile.getCompanyProfile("OC382982")));
+    const get = ch.use((c) => c.companyProfile.getCompanyProfile("OC382982"));
+    const profile = yield* get;
+    console.log(profile, foo);
+}).pipe(
+    Effect.provide(CompaniesHouse.layer({ apiKey: "REDACTED" })),
+    Effect.provide(Logger.layer([Logger.consolePretty()])),
 );
 
-export class CompaniesHouseClient extends Effect.Service<CompaniesHouseClient>()("effect-services/companieshouse/index/CompaniesHouseClient", {
-    effect: Effect.gen(function* () {
-        const createApiClient = (
-            apiKey: string
-        ) => Effect.gen(function* () {
-            const layer = FetchHttpClient.layer.pipe(
-                Layer.provide(
-                    Layer.succeed(FetchHttpClient.RequestInit, {
-                        headers: {
-                            Authorization: apiKey,
-                        },
-                    })
-                )
-            );
+Test.pipe(Effect.runPromise);*/
 
-            const client = yield* HttpClient.HttpClient.pipe(
-                Effect.provide(layer)
-            );
-            
-            const get = (
-                url: URL
-            ) => Effect.gen(function* () {
-                const response = yield* client.get(url).pipe(
-                    Effect.flatMap(HttpClientResponse.filterStatus((res) => res !== 429)),
-                    Effect.retry(RetryPolicy)
-                );
-
-                return response;
-            });
-
-            return {
-                get,
-                client,
-            };
-
-        });
-
-        return {
-            createApiClient
-        }
-    })
-}) { }
