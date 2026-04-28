@@ -165,6 +165,7 @@ const build = await Bun.build({
     target: "node",
     define: {
         COMPANIES_HOUSE_VERSION: getDepVersion("@companieshouse/api-sdk-node"),
+        COSMOS_VERSION: getDepVersion("@azure/cosmos"),
     }
 });
 

@@ -19,8 +19,6 @@ export class CosmosError extends Data.TaggedError("CosmosError")<{
     message: string;
 }> { }
 
-export const Foo = "bar";
-
 export class CosmosConfig extends Context.Tag("effect-services/Cosmos/index/CosmosConfig")<CosmosConfig, {
     readonly connectionString: Redacted.Redacted<string>;
     readonly databaseID: string;
