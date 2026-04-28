@@ -6,19 +6,19 @@ export const OauthResposneSchema = S.Struct({
     token_type: S.Literal("Bearer"),
     scope: S.String,
     refresh_token: S.NullOr(S.String),
-}).annotations({
+}).annotate({
     description: "/auth/oauth2/token",
 });
 
-const OptBool = S.optionalWith(S.Boolean, { exact: true });
-const OptStr = S.optionalWith(S.String, { exact: true });
-const OptInt = S.optionalWith(S.Int, { exact: true });
-const OptUtc = S.optionalWith(S.DateTimeUtc, { exact: true });
+const OptBool = S.optionalKey(S.Boolean);
+const OptStr = S.optionalKey(S.String);
+const OptInt = S.optionalKey(S.Int);
+const OptUtc = S.optionalKey(S.DateTimeUtc);
 
-const DefaultSecuritySchema = S.Literal("public", "view", "private");
-const AccessSchema = S.Literal("no_access", "read", "read_write", "full_access", "change_security");
-const ContentTypeSchema = S.Literal("D", 5);
-const WsTypeSchema = S.Literal(
+const DefaultSecuritySchema = S.Literals(["public", "view", "private"]);
+const AccessSchema = S.Literals(["no_access", "read", "read_write", "full_access", "change_security"]);
+const ContentTypeSchema = S.Literals(["D", 5]);
+const WsTypeSchema = S.Literals([
     "document",
     "folder",
     "workspace",
@@ -27,23 +27,20 @@ const WsTypeSchema = S.Literal(
     "folder_shortcut",
     "workspace_shortcut",
     "user",
-);
+]);
 
-const AuditSchema = S.Struct(
-    { comments: OptStr },
-    { key: S.String, value: S.Any }
-);
+const AuditSchema = S.Struct({ comments: OptStr });
 
 const TrusteesSchema = S.Array(S.Struct({
     id: S.String,
-    access_level: S.optionalWith(AccessSchema, { exact: true }),
-}, { key: S.String, value: S.Any }));
+    access_level: S.optionalKey(AccessSchema),
+}));
 
 export const UploadDocumentRequestSchema = S.Struct({
     warnings_for_required_and_disabled_fields: OptBool,
     keep_locked: OptBool,
-    audit: S.optionalWith(AuditSchema, { exact: true }),
-    inherit_profile_from_folder: S.optionalWith(S.Boolean, { exact: true }),
+    audit: S.optionalKey(AuditSchema),
+    inherit_profile_from_folder: OptBool,
     doc_profile: S.Struct({
         name: S.String,
         extension: OptStr,
@@ -52,16 +49,16 @@ export const UploadDocumentRequestSchema = S.Struct({
         auther: OptStr,
         checksum: OptStr,
         class: OptStr,
-        content_type: S.optionalWith(ContentTypeSchema, { exact: true }),
-        default_security: S.optionalWith(DefaultSecuritySchema, { exact: true }),
+        content_type: S.optionalKey(ContentTypeSchema),
+        default_security: S.optionalKey(DefaultSecuritySchema),
         file_create_date: OptUtc,
         file_edit_date: OptUtc,
         is_hipaa: OptBool,
         retain_days: OptInt,
-    }, { key: S.String, value: S.Any }),
-    user_trustees: S.optionalWith(TrusteesSchema, { exact: true }),
-    group_trustees: S.optionalWith(TrusteesSchema, { exact: true }),
-}, { key: S.String, value: S.Any }).annotations({
+    }),
+    user_trustees: S.optionalKey(TrusteesSchema),
+    group_trustees: S.optionalKey(TrusteesSchema),
+}).annotate({
     description: "/work/api/v2/customers/{customerId}/libraries/{libraryId}/folders/{folderId}/documents"
 });
 
@@ -84,19 +81,19 @@ export const UploadDocumentResponseSchema = S.Struct({
         is_declared: OptBool,
         declared: OptBool,
         location: OptStr,
-        default_security: S.optionalWith(DefaultSecuritySchema, { exact: true }),
+        default_security: S.optionalKey(DefaultSecuritySchema),
         last_user: OptStr,
         is_in_use: OptBool,
         is_checked_out: OptBool,
         comment: OptStr,
-        access: S.optionalWith(AccessSchema, { exact: true }),
+        access: S.optionalKey(AccessSchema),
         author_description: OptStr,
         operator_description: OptStr,
         type_description: OptStr,
         class_description: OptStr,
         last_user_description: OptStr,
         extension: S.String,
-        content_type: S.optionalWith(ContentTypeSchema, { exact: true }),
+        content_type: S.optionalKey(ContentTypeSchema),
         edit_profile_date: OptUtc,
         is_external: OptBool,
         is_external_as_normal: OptBool,
@@ -111,10 +108,10 @@ export const UploadDocumentResponseSchema = S.Struct({
         iwl: S.String,
         workspace_id: S.String,
     }),
-    warnings: S.Union(S.Tuple(), S.Array(S.Struct({
+    warnings: S.Union([S.Tuple([]), S.Array(S.Struct({
         field: S.String,
         error: S.String,
-    }))),
-}, { key: S.String, value: S.Any }).annotations({
+    }))]),
+}).annotate({
     description: "/work/api/v2/customers/{customerId}/libraries/{libraryId}/folders/{folderId}/documents",
 });
