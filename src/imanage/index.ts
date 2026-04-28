@@ -1,10 +1,7 @@
-import * as Effect from "effect/Effect";
-import * as Redacted from 'effect/Redacted';
-import * as Ref from "effect/Ref";
-import * as Option from "effect/Option";
-import * as Context from "effect/Context";
-import { FetchHttpClient, HttpBody, HttpClient, HttpClientRequest, HttpClientResponse, UrlParams } from "@effect/platform";
+import { FetchHttpClient, HttpBody, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
 import { OauthResposneSchema, UploadDocumentRequestSchema } from "./schema";
+import { unwravel } from "../internals/helpers";
+import { Context, Effect, Layer, Option, Redacted, Ref, Semaphore } from "effect";
 
 type OAuthToken = {
     accessToken: string;
@@ -12,46 +9,56 @@ type OAuthToken = {
     expiresAt_epochMs: number;
 }
 
-export class ImanageConfig extends Context.Tag("effect-services/Imanage/index/ImanageConfig")<ImanageConfig, {
+interface ImanageConfigOpts {
     readonly username: string;
-    readonly password: Redacted.Redacted<string>;
+    readonly password: string | Redacted.Redacted<string>;
     readonly client_id: string;
-    readonly client_secret: Redacted.Redacted<string>;
+    readonly client_secret: string | Redacted.Redacted<string>;
     readonly baseURL: URL;
-}>(){}
+    library: "LIVE" | "DEV" | (string & {});
+}
+
+export class ImanageConfig extends Context.Service<ImanageConfig, ImanageConfigOpts>()("effect-services/imanage/index/ImanageConfigService"){}
+
+const ImanageConfigLayer = (opts: ImanageConfigOpts) => Layer.succeed(ImanageConfig, opts);
 
 const authenticate = Effect.gen(function* () {
     const conf = yield* ImanageConfig;
+
     const payload = {
         grant_type: "password",
         username: conf.username,
-        password: Redacted.value(conf.password),
+        password: unwravel(conf.password),
         client_id: conf.client_id,
-        client_secret: Redacted.value(conf.client_secret),
+        client_secret: unwravel(conf.client_secret),
     }
-
-    const unauthedClient = yield* HttpClient.HttpClient;
+    
+    const unauthedClient = (yield* HttpClient.HttpClient);
 
     const url = new URL("/auth/oauth2/token", conf.baseURL);
 
-    const response = yield* unauthedClient.post(url, {
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: HttpBody.urlParams(UrlParams.fromInput(payload)),
-    }).pipe(
-        Effect.flatMap((res) => HttpClientResponse.schemaBodyJson(OauthResposneSchema)(res)),
+    const request = HttpClientRequest.post(url).pipe(
+        HttpClientRequest.setHeader("Content-Type", "application/x-www-form-urlencoded"),
+        HttpClientRequest.prependUrl(conf.baseURL.href),
+        HttpClientRequest.bodyFormDataRecord(payload),
     );
 
-    return {
-        accessToken: response.access_token,
-        refreshToken: response.refresh_token,
+    const response = yield* unauthedClient.execute(request);
+    const body = yield* HttpClientResponse.schemaBodyJson(OauthResposneSchema)(response);
+
+    const token: OAuthToken = {
+        accessToken: body.access_token,
+        refreshToken: body.refresh_token,
         // subtract a little skew to be safe
-        expiresAt_epochMs: Date.now() + (response.expires_in - 30) * 1000
-    } satisfies OAuthToken;
+        expiresAt_epochMs: Date.now() + (body.expires_in - 30) * 1000
+    };
+
+    return token;
 });
 
 const makeTokenManager = Effect.gen(function* () {
     const ref = yield* Ref.make<Option.Option<OAuthToken>>(Option.none());
-    const mutex = yield* Effect.makeSemaphore(1);
+    const mutex = yield* Semaphore.make(1);
 
     const getValidToken = Effect.gen(function* () {
         const now = Date.now();
@@ -68,9 +75,8 @@ const makeTokenManager = Effect.gen(function* () {
                 if (Option.isSome(recheck) && recheck.value.expiresAt_epochMs > Date.now()) {
                     return recheck.value.accessToken;
                 }
-                const getFresh = Effect.tapErrorTag(authenticate, "ParseError", (err) => Effect.gen(function* () {
+                const getFresh = Effect.tapErrorTag(authenticate, "SchemaError", (err) => Effect.gen(function* () {
                     yield* Effect.logError("parse error msg:", err.message);
-                    yield* Effect.logError("actual:", err.issue.actual);
                 }));
 
                 yield* Effect.logWarning("Token expired or non-existant, retrieving new token...");
@@ -85,15 +91,11 @@ const makeTokenManager = Effect.gen(function* () {
     return { getValidToken }
 });
 
-export class ImanageService extends Effect.Service<ImanageService>()("ImanageService", {
-    effect: Effect.gen(function* () {
-        const conf = yield* ImanageConfig;
+export class ImanageService extends Context.Service<ImanageService>()("effect-services/imanage/index/ImanageService", {
+    make: Effect.gen(function* () {
+        const config = yield* ImanageConfig;
 
-        const library: "LIVE" | "DEV" = Bun.env.NODE_ENV === "production"
-            ? "LIVE"
-            : "DEV";
-
-        const helperPath = `${conf.baseURL.href}/work/api/v2/customers/1/libraries/${library}` as const;
+        const helperPath = `/work/api/v2/customers/1/libraries/${config.library}` as const;
 
         const tokenManager = yield* makeTokenManager;
         const getToken = tokenManager.getValidToken;
@@ -102,22 +104,22 @@ export class ImanageService extends Effect.Service<ImanageService>()("ImanageSer
             HttpClient.mapRequestEffect((req) => Effect.gen(function* () {
                 const token = yield* getToken;
                 return HttpClientRequest.setHeader(req, "X-Auth-Token", token);
-            })),
+            }))
         );
+
 
         const uploadFile = (args: {
             folderID: string;
-            file: ArrayBuffer;
+            file: Buffer;
             docProfile: typeof UploadDocumentRequestSchema.Encoded;
         }) => Effect.gen(function* () {
             const { docProfile, folderID, file } = args;
         
             const url = new URL(`${helperPath}/folders/${folderID}/documents`);
             
-            const buff = new Uint8Array(file);
             const formData = new FormData();
             formData.append("profile", new Blob([JSON.stringify(docProfile)], { type: "application/json" }));
-            formData.append("file", new Blob([buff]));
+            formData.append("file", new Blob([file]));
             const body = HttpBody.formData(formData);
 
             const response = yield* authedClient.post(url, {
@@ -128,13 +130,14 @@ export class ImanageService extends Effect.Service<ImanageService>()("ImanageSer
         });
 
         return {
-            library,
             helperPath,
-            basePath: conf.baseURL,
             client: authedClient,
-            uploadFile,
+            uploadFile
         }
-    }).pipe(
-        Effect.provide(FetchHttpClient.layer),
+    })
+}){
+    static readonly layer = (opts: ImanageConfigOpts) => Layer.effect(this, this.make).pipe(
+        Layer.provide(FetchHttpClient.layer),
+        Layer.provide(ImanageConfigLayer(opts))
     )
-}) { }
+}
