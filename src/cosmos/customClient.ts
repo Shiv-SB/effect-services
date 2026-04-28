@@ -2,6 +2,7 @@ import { Context, Duration, Effect, Layer, Redacted, Schedule, Stream, flow } fr
 import { type CosmosSDKConfigOpts } from "./CosmosSDK";
 import { CosmosClient as _client, ErrorResponse, type ItemDefinition, type SqlQuerySpec } from "@azure/cosmos";
 import { CosmosError } from "./common";
+import { unwravel } from '../internals/helpers';
 
 interface CosmosClientConfigOpts extends CosmosSDKConfigOpts {
     databaseID: string;
@@ -28,11 +29,7 @@ export class CosmosClient extends Context.Service<CosmosClient>()("effect-servic
     make: Effect.gen(function* () {
         const c = yield* CosmosClientConfig;
 
-        const connStr: string = Redacted.isRedacted(c.connectionString)
-            ? Redacted.value(c.connectionString)
-            : c.connectionString;
-
-        const client = new _client(connStr);
+        const client = new _client(unwravel(c.connectionString));
         const db = client.database(c.databaseID);
 
         const container = Effect.fn(function* (containerName: string) {

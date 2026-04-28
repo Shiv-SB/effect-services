@@ -1,6 +1,7 @@
 import { Context, Duration, Effect, flow, Layer, Option, Redacted, Schedule, Schema, Stream } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import type { HttpClientError } from "effect/unstable/http/HttpClientError";
+import { unwravel } from "../internals/helpers";
 
 function extractLinkValue(linkHeaderValue: string): Option.Option<URL> {
     const match = linkHeaderValue.match(/<([^>]+)>/);
@@ -44,9 +45,7 @@ export class FreshService extends Context.Service<FreshService>()("effect-servic
     make: Effect.gen(function* () {
         const config = yield* FreshServiceConfig;
 
-        const token = Redacted.isRedacted(config.token)
-            ? Redacted.value(config.token)
-            : config.token;
+        const token = unwravel(config.token);
 
         const RetryPolicy = Schedule.identity<HttpClientError>().pipe(
             Schedule.addDelay((e) => handleRetry(e))

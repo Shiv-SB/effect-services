@@ -1,5 +1,9 @@
 import { Redacted } from "effect";
 
+/**
+ * If the given secret is a Redacted string, get the value,
+ * otherwise return the secret.
+ */
 export function unwravel(secret: Redacted.Redacted<string> | string): string {
     if (Redacted.isRedacted(secret)) return Redacted.value(secret);
     return secret;

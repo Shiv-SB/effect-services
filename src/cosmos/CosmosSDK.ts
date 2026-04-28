@@ -2,6 +2,7 @@ import { type CosmosClient } from "@azure/cosmos";
 import { Context, Effect, Layer, Redacted } from "effect";
 import { CosmosClient as _client } from "@azure/cosmos";
 import { CosmosError } from "./common";
+import { unwravel } from "../internals/helpers";
 
 export interface CosmosSDKConfigOpts {
     connectionString: string | Redacted.Redacted<string>;
@@ -21,11 +22,7 @@ export class CosmosClientSDK extends Context.Service<CosmosClientSDK>()("effect-
     make: Effect.gen(function* () {
         const c = yield* CosmosSDKConfig;
         
-        const connStr: string = Redacted.isRedacted(c.connectionString)
-            ? Redacted.value(c.connectionString)
-            : c.connectionString;
-
-        const client = new _client(connStr);
+        const client = new _client(unwravel(c.connectionString));
 
         const caller: CosmosSdkImpl =  {
             use: (fn) => Effect.gen(function* () {

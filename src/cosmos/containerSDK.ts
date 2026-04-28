@@ -1,8 +1,9 @@
-import { Context, Effect, Layer, Redacted } from "effect";
+import { Context, Effect, Layer } from "effect";
 import type { CosmosSDKConfigOpts } from "./CosmosSDK";
 import type { Container } from "@azure/cosmos";
 import { CosmosError } from "./common";
 import { CosmosClient as _client } from "@azure/cosmos";
+import { unwravel } from "../internals/helpers";
 
 interface ContainerConfigOpts extends CosmosSDKConfigOpts {
     databaseID: string;
@@ -27,11 +28,7 @@ export class ContainerClientSDK extends Context.Service<ContainerClientSDK>()("e
     make: Effect.gen(function* () {
         const config = yield* ContainerConfig;
 
-        const connStr: string = Redacted.isRedacted(config.connectionString)
-            ? Redacted.value(config.connectionString)
-            : config.connectionString;
-
-        const client = new _client(connStr)
+        const client = new _client(unwravel(config.connectionString))
             .database(config.databaseID)
             .container(config.containerID);
 
