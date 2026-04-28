@@ -83,6 +83,7 @@ export class KeyVaultAsCache extends Context.Service<KeyVaultAsCache>()("effect-
 const MakeConfigHandler = (keyVaultOpts: KeyVaultOpts) => Effect.fn(function* (path: ConfigProvider.Path) {
     const kv = yield* KeyVault;
     const key = path.join("");
+    yield* Effect.log("Fetching key:", key);
     const secret = yield* kv.use((c) => c.getSecret(key)).pipe(Effect.map((s) => s.value));
 
     if (!secret) return undefined;
@@ -96,6 +97,35 @@ const MakeConfigHandler = (keyVaultOpts: KeyVaultOpts) => Effect.fn(function* (p
     Effect.provide(KeyVault.layer(keyVaultOpts)),
 ));
 
+/**
+ * A ConfigProvider factory which uses an underlying KeyVault service.
+ * 
+ * Warning!
+ * Only supports Config.string constructors.
+ * i.e. 
+ * 
+ * Supported:
+ * `const secret = yield* Config.string("foo");`
+ * 
+ * Not Supported:
+ * `const secret = yield* Config.number("foo");`
+ * 
+ * @example
+ * const provider = MakeKeyVaultProvider({
+ *      vaultURL: "https://example.vault.azure.net/"
+ *      credential: new DefaultAzureCredential()
+ * });
+ * 
+ * const providerLayer = ConfigProvider.layer(provider);
+ * 
+ * Effect.gen(function* () {
+ *      const secret = yield* Config.string("service-prod-key");
+ *      yield* Effect.log("Secret:", secret);
+ * }).pipe(
+ *      Effect.provide(layer),
+ *      Effect.runPromise
+ * );
+ */
 export const MakeKeyVaultProvider = (
     opts: KeyVaultOpts
 ) => ConfigProvider.make((p) => MakeConfigHandler(opts)(p));
