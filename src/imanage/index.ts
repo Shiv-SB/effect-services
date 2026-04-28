@@ -44,7 +44,7 @@ const authenticate = Effect.gen(function* () {
     );
 
     const response = yield* unauthedClient.execute(request);
-    const body = yield* HttpClientResponse.schemaBodyJson(OauthResposneSchema)(response);
+    const body = yield* HttpClientResponse.schemaBodyJson(OauthResposneSchema, { onExcessProperty: "ignore" })(response);
 
     const token: OAuthToken = {
         accessToken: body.access_token,
