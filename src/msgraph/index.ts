@@ -1,24 +1,13 @@
-import * as Config from "effect/Config";
-import * as ConfigProvider from "effect/ConfigProvider";
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as S from "effect/Schema";
-import * as Stream from "effect/Stream";
-import * as Either from "effect/Either";
-import * as Option from "effect/Option";
 import { Client, GraphRequest } from "@microsoft/microsoft-graph-client";
+import { Effect, Data, Context, Layer, Schema as S, Stream, Schedule, Option } from "effect";
+import { unwravel, type RedactedOr } from "../internals/helpers";
 import { ClientSecretCredential } from "@azure/identity";
-import {
-    TokenCredentialAuthenticationProvider
-} from "@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials";
-import { Schedule } from "effect";
+import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials';
 
 export class MsGraphError extends Data.TaggedError("MsGraphError")<{
     cause?: unknown;
     message: string;
-}> { }
+}>{}
 
 interface MsGraphImpl {
     use: <T>(
@@ -26,124 +15,93 @@ interface MsGraphImpl {
     ) => Effect.Effect<Awaited<T>, MsGraphError, never>
 }
 
-export class MsGraph extends Context.Tag("effect-services/MsGraph/index2/MsGraph")<
-    MsGraph,
-    MsGraphImpl
->() { }
-
-type MsGraphArgs = {
+interface MsGraphConfigOpts {
     readonly tenantID: string;
     readonly clientID: string;
-    readonly clientSecret: string;
+    readonly clientSecret: RedactedOr<string>;
     readonly scopes: string[];
 }
 
-export const make = (
-    options: MsGraphArgs
-) => Effect.gen(function* () {
-    const creds = new ClientSecretCredential(
-        options.tenantID,
-        options.clientID,
-        options.clientSecret
-    );
+class MsGraphConfig extends Context.Service<MsGraphConfig, MsGraphConfigOpts>()("effect-services/msgraph/new/MsGraphConfig"){}
 
-    const authProvider = new TokenCredentialAuthenticationProvider(creds, {
-        scopes: options.scopes
-    });
+const MsGraphConfigLayer = (opts: MsGraphConfigOpts) => Layer.succeed(MsGraphConfig, opts);
 
-    const graphClient = Client.initWithMiddleware({ authProvider });
+export class MsGraph extends Context.Service<MsGraph>()("effect-services/msgraph/new/MsGraph", {
+    make: Effect.gen(function* () {
+        const c = yield* MsGraphConfig;
+        const credential = new ClientSecretCredential(
+            c.tenantID,
+            c.clientID,
+            unwravel(c.clientSecret),
+        );
 
-    return MsGraph.of({
-        use: (fn) => Effect.gen(function* () {
-            const result = yield* Effect.try({
-                try: () => fn(graphClient),
-                catch: (e) => new MsGraphError({
-                    cause: e,
-                    message: "Syncronous error in 'MsGraph.use'"
-                })
-            });
+        const authProvider = new TokenCredentialAuthenticationProvider(credential, { scopes: c.scopes });
 
-            if (result instanceof Promise) {
-                return yield* Effect.tryPromise({
-                    try: () => result,
+        const client = Client.initWithMiddleware({ authProvider });
+
+        const caller: MsGraphImpl = {
+            use: (fn) => Effect.gen(function* () {
+                const result = yield* Effect.try({
+                    try: () => fn(client),
                     catch: (e) => new MsGraphError({
                         cause: e,
-                        message: "Asyncronous error in 'MsGraph.use'"
+                        message: "Syncronous error in MsGraph.use'"
                     })
                 });
-            } else {
-                return result;
-            }
-        })
-    });
-});
 
-export const layer = (
-    options: MsGraphArgs
-) => Layer.scoped(MsGraph, make(options));
-
-export const fromEnv = Layer.scoped(
-    MsGraph,
-    Effect.gen(function* () {
-        const tenantID = yield* Config.string("MSGRAPH_TENANT_ID");
-        const clientID = yield* Config.string("MSGRAPH_CLIENT_ID");
-        const clientSecret = yield* Config.string("MSGRAPH_CLIENT_SECRET");
-        const scopes = yield* Config.array(Config.string(), "MS_GRAPH_SCOPES").pipe(
-            Config.withDefault<string[]>(["https://graph.microsoft.com/.default"]),
-        );
-
-        return yield* make({
-            tenantID,
-            clientID,
-            clientSecret,
-            scopes,
-        }).pipe(
-            Effect.withConfigProvider(ConfigProvider.fromEnv())
-        );
+                if (result instanceof Promise) {
+                    return yield* Effect.tryPromise({
+                        try: () => result,
+                        catch: (e) => new MsGraphError({
+                            cause: e,
+                            message: "Asyncronous error in 'MsGraph.use'"
+                        })
+                    })
+                } else {
+                    return result;
+                }
+            })
+        }
+        return caller;
     })
-);
+}){
+    static readonly layer = (opts: MsGraphConfigOpts) => Layer.effect(this, this.make).pipe(
+        Layer.provide(MsGraphConfigLayer(opts))
+    )
+}
 
 export const PaginationFields = S.Struct({
     "@odata.context": S.URL,
-    "@odata.nextLink": S.optional(S.URL), // doesnt exist on last page
-    value: S.Array(S.Unknown),
+    "@odata.nextLink": S.optional(S.URL),
+    value: S.Array(S.Unknown)
 });
 
-export const makeStream = (
-    request: GraphRequest
-) => Effect.gen(function* () {
+export const MakeStream = Effect.fn(function* (request: GraphRequest) {
     const graph = yield* MsGraph;
-    const decode = S.decodeUnknownEither(PaginationFields);
-    const stream = Stream.paginateEffect(request, (req) => Effect.gen(function* () {
-        const getResponse = Effect.tryPromise({
+    const decode = S.decodeUnknownEffect(PaginationFields);
+
+    const stream = Stream.paginate(request, (req) => Effect.gen(function* () {
+        const GetResponse = Effect.tryPromise({
             try: () => req.get(),
             catch: (e) => new MsGraphError({
                 cause: e,
-                message: "makeStream unable to process given request"
+                message: "MakeStream unable to process given request"
             })
-        }).pipe(Effect.retry({ times: 3, schedule: Schedule.exponential(1) }));
+        }).pipe(
+            Effect.retry({ times: 3, schedule: Schedule.exponential(1) })
+        );
 
-        const response = yield* getResponse;
-        const decoded = decode(response);
+        const response = yield* GetResponse;
+        const json = yield* decode(response);
 
-        if (Either.isLeft(decoded)) {
-            yield* Effect.logError("MsGraph makeStream recieved unexpected data structure.", decoded.left);
-            return [
-                [],
-                Option.none()
-            ];
-        }
+        const rawNextLink: URL | undefined = json["@odata.nextLink"];
 
-        const nextLink: URL | undefined = decoded.right["@odata.nextLink"];
-        const next = nextLink
-            ? Option.some(yield* graph.use((c) => c.api(nextLink.href)))
+        const next = rawNextLink
+            ? Option.some(yield* graph.use((c) => c.api(rawNextLink.href)))
             : Option.none();
 
-        return [
-            decoded.right.value,
-            next
-        ];
-    })).pipe(Stream.mapConcat((x) => x.flat()));
+        return [json.value, next];
+    }));
 
     return stream;
 });
