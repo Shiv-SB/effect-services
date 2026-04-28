@@ -1,6 +1,7 @@
 import * as S from "effect/Schema";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
+import { pipe } from "effect";
 
 export class ValidatorError extends Data.TaggedError("ValidatorError")<{
     message: string;
@@ -28,9 +29,9 @@ export const Validator = <A extends string, L extends string>(
         longFlags = [],
     } = opts;
 
-    const allowedArgsSchema = S.Array(S.Literal(...allowedArgs))
+    const allowedArgsSchema = S.Array(S.Literals(allowedArgs))
         .pipe(S.mutable)
-        .annotations({ identifier: "Allowed Arguments" });
+        .annotate({ identifier: "Allowed Arguments" });
 
     const args = Bun.argv.slice(2);
 
@@ -95,20 +96,20 @@ export const Validator = <A extends string, L extends string>(
         process.exit(0);
     }
 
-    const result = S.decodeUnknownEither(allowedArgsSchema)(collectedArgs);
+    const result = S.decodeUnknownResult(allowedArgsSchema)(collectedArgs);
 
 
-    if (result._tag === "Left") {
+    if (result._tag === "Failure") {
         return yield* new ValidatorError({
-            message: result.left.message,
+            message: result.failure.toString(),
             reason: "INVALID_CLI_ARGS",
         });
     }
 
-    return { args: result.right, longFlags: collectedLongFlags };
+    return { args: result.success, longFlags: collectedLongFlags };
 });
 
-/*const Test = Effect.gen(function* () {
+const Test = Effect.gen(function* () {
     const result = yield* Validator({
         shortFlag: "-c",
         allowedArgs: ["users", "sessions"],
@@ -120,6 +121,5 @@ export const Validator = <A extends string, L extends string>(
 
 pipe(
     Test,
-    Effect.provide(Logger.pretty),
     Effect.runPromise,
-)*/
+)
