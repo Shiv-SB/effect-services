@@ -5,7 +5,7 @@ import * as fsSync from "node:fs";
 import pkg from "../package.json";
 import { Schema } from "effect";
 
-// # region Utils
+// #region Utils
 
 function printC(
     col: string,
@@ -50,6 +50,10 @@ const allIndexFiles: string[] = getAllIndexFiles();
 
 async function deleteBuildFolder() {
     await fs.rm("build", { recursive: true, force: true });
+}
+
+function getDepVersion(name: keyof typeof pkg.dependencies): string {
+    return JSON.stringify(pkg.dependencies[name]);
 }
 
 function getArgs() {
@@ -159,6 +163,9 @@ const build = await Bun.build({
     sourcemap: "none",
     format: "esm",
     target: "node",
+    define: {
+        COMPANIES_HOUSE_VERSION: getDepVersion("@companieshouse/api-sdk-node"),
+    }
 });
 
 const end = performance.now();
