@@ -1,5 +1,5 @@
 import * as S from "effect/Schema";
-import type { SchemaAST } from "effect";
+import { type SchemaAST, Struct } from "effect";
 
 const TaggedStruct = <
     Tag extends SchemaAST.LiteralValue,
@@ -7,17 +7,9 @@ const TaggedStruct = <
 >(
     tag: Tag,
     fields: Fields
-) =>
-    S.Struct({
-        _tag: S.Literal(tag).pipe(
-            S.optional,
-            S.withDefaults({
-                constructor: () => tag, // Apply _tag during instance construction
-                decoding: () => tag // Apply _tag during decoding
-            })
-        ),
-        ...fields
-    });
+) => S.Struct({
+    _tag: S.tagDefaultOmit(tag)
+}).mapFields(Struct.assign(fields));
 
 export const LeglPaginationFields = S.Struct({
     count: S.Int,
@@ -30,12 +22,14 @@ export const LeglPaginationFieldsWithResult = S.Struct({
     results: S.Array(S.Unknown),
 });
 
-const StepTypeEnum = S.Literal("cdd", "source-of-funds", "document-request", "signature-request", "custom-form");
+const StepTypeEnum = S.Literals(["cdd", "source-of-funds", "document-request", "signature-request", "custom-form"]);
 
-const CheckResultEnum = S.Literal("clear", "consider");
+const CheckResultEnum = S.Literals(["clear", "consider"]);
+
+const GenericStringRecord = S.Record(S.String, S.String);
 
 const CddResultSchema = TaggedStruct("CddResult", {
-    client_information: S.Record({ key: S.String, value: S.String }),
+    client_information: GenericStringRecord,
     overall_result: S.NullOr(CheckResultEnum),
     id_data_validation_result: S.NullOr(CheckResultEnum),
     identity_validation_result: S.NullOr(CheckResultEnum),
@@ -49,7 +43,7 @@ const CddResultSchema = TaggedStruct("CddResult", {
 });
 
 const EnhancedCddResultSchema = TaggedStruct("EnhancedCddResult", {
-    client_information: S.Record({ key: S.String, value: S.String }),
+    client_information: GenericStringRecord,
     overall_result: S.NullOr(CheckResultEnum),
     id_data_validation_result: S.NullOr(CheckResultEnum),
     peps_and_sanctions_result: S.NullOr(CheckResultEnum),
@@ -64,8 +58,8 @@ const SourcesList = S.Array(TaggedStruct("SourcesList", {
     name: S.NullOr(S.String),
     is_recieved: S.NullOr(S.Boolean),
     salary: S.NullOr(S.Number),
-    type: S.Literal(
-        "gift", "inheritance", "investments-sale", "loan", "other", "property-sale", "remortgage", "mortgage", "savings"
+    type: S.Literals(
+        ["gift", "inheritance", "investments-sale", "loan", "other", "property-sale", "remortgage", "mortgage", "savings"]
     ),
     appears_on_statement_as: S.NullOr(S.String),
     is_pension_claimed: S.NullOr(S.Boolean),
@@ -73,15 +67,15 @@ const SourcesList = S.Array(TaggedStruct("SourcesList", {
     pension_start: S.NullOr(S.DateTimeUtc),
     pension_frequency: S.NullOr(S.String),
     addresses: S.Array(S.Struct({
-        type: S.Literal("lender", "property", "solicitor", "third_party"),
-    }, { key: S.String, value: S.NullOr(S.String) })),
+        type: S.Literals(["lender", "property", "solicitor", "third_party"]),
+    })),
     overseas_funds: S.NullOr(S.Boolean),
 }));
 
 // If Arr then SourcesList, otherwise will be discriminated Cdd or Enhanced Cdd.
-const StepResultsDataSchema = S.Union(
+const StepResultsDataSchema = S.Union([
     CddResultSchema, EnhancedCddResultSchema, SourcesList,
-).annotations({
+]).annotate({
     description:
         `On the API, this field will NOT be present unless the include_results query parameter is true. 
             The value will be null for all steps types except "cdd".
@@ -110,7 +104,7 @@ const EngageRequestSchema = S.Struct({
     completed_date: S.DateTimeUtc,
     completed_redirect_url: S.NullOr(S.URL),
     view_url: S.URL,
-    status: S.Literal("Created", "Sent", "In progress", "Ready for review", "Reviewed", "Marked closed", "Processing"),
+    status: S.Literals(["Created", "Sent", "In progress", "Ready for review", "Reviewed", "Marked closed", "Processing"]),
     hidden_reference: S.NullOr(S.String),
 });
 
