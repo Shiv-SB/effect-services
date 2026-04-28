@@ -1,15 +1,9 @@
-import { SecretClient, type SecretClientOptions } from "@azure/keyvault-secrets";
-import { DefaultAzureCredential, type TokenCredential } from "@azure/identity";
-import * as Cache from "effect/Cache";
-import * as Config from "effect/Config";
-import * as ConfigProvider from "effect/ConfigProvider";
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as HashSet from "effect/HashSet";
+import { SecretClient } from "@azure/keyvault-secrets";
+import { Cache, ConfigProvider, Context, Data, Effect, flow, Layer } from "effect";
+import { type TokenCredential } from "@azure/identity";
+import { SourceError } from "effect/ConfigProvider";
 
-export class KeyVaultError extends Data.TaggedError("KeyVaultError")<{
+export class KeyVaultError extends Data.TaggedError("keyVaultError")<{
     cause?: unknown;
     message?: string;
 }> { }
@@ -17,109 +11,91 @@ export class KeyVaultError extends Data.TaggedError("KeyVaultError")<{
 interface KeyVaultImpl {
     use: <T>(
         fn: (client: SecretClient) => T
-    ) => Effect.Effect<Awaited<T>, KeyVaultError, never>
-}
-
-export class KeyVault extends Context.Tag("effect-services/client/KeyVault")<
-    KeyVault,
-    KeyVaultImpl
->() { }
-
-type SecretClientArgs = {
-    vaultURL: string;
-    credential: TokenCredential;
-    pipelineOptions?: SecretClientOptions;
+    ) => Effect.Effect<Awaited<T>, KeyVaultError>
 };
 
-export const make = (
-    options: SecretClientArgs
-) => Effect.gen(function* () {
-    const client = new SecretClient(
-        options.vaultURL,
-        options.credential,
-        options.pipelineOptions
-    );
+export interface KeyVaultOpts {
+    vaultURL: string | URL;
+    credential: TokenCredential;
+};
 
-    return KeyVault.of({
-        use: (fn) => Effect.gen(function* () {
-            const result = yield* Effect.try({
-                try: () => fn(client),
-                catch: (e) => new KeyVaultError({
-                    cause: e,
-                    message: "Syncronous error in 'KeyVault.use'"
-                })
-            });
+class KeyVaultConfig extends Context.Service<
+    KeyVaultConfig,
+    KeyVaultOpts
+>()("effect-services/keyvault/KeyVaultConfig") { };
 
-            if (result instanceof Promise) {
-                return yield* Effect.tryPromise({
-                    try: () => result,
+export const KvConfigLayer = (
+    opts: KeyVaultOpts
+) => Layer.succeed(KeyVaultConfig, opts);
+
+export class KeyVault extends Context.Service<KeyVault>()("effect-services/keyvault/KeyVault", {
+    make: Effect.gen(function* () {
+        const config = yield* KeyVaultConfig;
+        const url = config.vaultURL.toString();
+        const _client = new SecretClient(url, config.credential);
+
+        const caller: KeyVaultImpl = {
+            use: (fn) => Effect.gen(function* () {
+                const result = yield* Effect.try({
+                    try: () => fn(_client),
                     catch: (e) => new KeyVaultError({
                         cause: e,
-                        message: "Asyncronous error in 'KeyVault.use'"
+                        message: "Syncronous error in KeyVault.use"
                     })
                 });
-            } else {
-                return result;
-            }
-        })
-    });
-});
 
-export const layer = (
-    options: SecretClientArgs
-) => Layer.scoped(KeyVault, make(options));
-
-export const fromEnv = Layer.scoped(
-    KeyVault,
-    Effect.gen(function* () {
-        const url = yield* Config.url("KV_URL")
-        return yield* make({
-            vaultURL: url.href,
-            credential: new DefaultAzureCredential()
-        }).pipe(
-            Effect.withConfigProvider(ConfigProvider.fromEnv()),
-        );
+                if (result instanceof Promise) {
+                    return yield* Effect.tryPromise({
+                        try: () => result,
+                        catch: (e) => new KeyVaultError({
+                            cause: e,
+                            message: "Asyncronous error in KeyVault.use",
+                        })
+                    });
+                } else {
+                    return result;
+                }
+            })
+        }
+        return caller;
     })
-);
+}) {
+    static readonly layer = (opts: KeyVaultOpts) => Layer.effect(this, this.make).pipe(
+        Layer.provide(KvConfigLayer(opts))
+    )
+}
 
-export class KeyVaultAsCache extends Effect.Service<KeyVaultAsCache>()("effect-services/client/KeyVaultAsCache", {
-    dependencies: [fromEnv],
-    effect: (options: Omit<Parameters<typeof Cache["make"]>[0], "lookup">) => Effect.gen(function* () {
+export type CacheOptions = Omit<Parameters<typeof Cache["make"]>[0], "lookup">;
+
+export class KeyVaultAsCache extends Context.Service<KeyVaultAsCache>()("effect-services/keyvault/new/KeyVaultAsCache", { 
+    make: Effect.fn(function* (options: CacheOptions) {
         const kv = yield* KeyVault;
         const cache = yield* Cache.make({
             ...options,
-            lookup: (key: string) => kv.use((c) => c.getSecret(key)),
+            lookup: (key: string) => kv.use((c) => c.getSecret(key))
         });
         return cache;
     })
-}) { }
-
-// #region ConfigProvider
-
-export const makeAzureKvProvider = (
-    options: SecretClientArgs
-): ConfigProvider.ConfigProvider => {
-    const client = new SecretClient(
-        options.vaultURL,
-        options.credential,
-        options.pipelineOptions
-    );
-
-    return ConfigProvider.fromFlat(
-        ConfigProvider.makeFlat({
-            // @ts-ignore Using generic breaks the below args for some reason
-            load: <A>(path, _conf, _split) => Effect.tryPromise({
-                try: async () => {
-                    const secretName = path.join("--");
-                    const secret = await client.getSecret(secretName);
-                    return [secret.value ?? ""] as A[];
-                },
-                catch: (_e) => [] as A[]
-            }).pipe(Effect.orElseSucceed(() => [] as A[])),
-            enumerateChildren: (_path) => Effect.succeed(HashSet.empty()),
-            patch: {
-                _tag: "Empty"
-            }
-        })
-    );
+}){
+    static readonly layer = (cacheOptions: CacheOptions) => Layer.effect(this, this.make(cacheOptions))
 }
+
+const MakeConfigHandler = (keyVaultOpts: KeyVaultOpts) => Effect.fn(function* (path: ConfigProvider.Path) {
+    const kv = yield* KeyVault;
+    const key = path.join("");
+    const secret = yield* kv.use((c) => c.getSecret(key)).pipe(Effect.map((s) => s.value));
+
+    if (!secret) return undefined;
+
+    return ConfigProvider.makeValue(secret);
+}, flow(
+    Effect.mapError((e) => new SourceError({
+        message: "Underlying Key Vault Service errored.",
+        cause: e,
+    })),
+    Effect.provide(KeyVault.layer(keyVaultOpts)),
+));
+
+export const MakeKeyVaultProvider = (
+    opts: KeyVaultOpts
+) => ConfigProvider.make((p) => MakeConfigHandler(opts)(p));
