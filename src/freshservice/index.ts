@@ -1,122 +1,118 @@
-import * as Effect from "effect/Effect";
-import * as Redacted from "effect/Redacted";
-import * as Layer from "effect/Layer";
-import * as S from "effect/Schema";
-import * as Duration from "effect/Duration";
-import * as Schedule from "effect/Schedule";
-import * as Stream from "effect/Stream";
-import * as Option from "effect/Option";
-import * as Context from "effect/Context";
-import { FetchHttpClient, HttpClient, HttpClientResponse } from "@effect/platform";
-import { pipe } from "effect";
-import type { HttpClientError } from "@effect/platform/HttpClientError";
+import { Context, Duration, Effect, flow, Layer, Option, Redacted, Schedule, Schema, Stream } from "effect";
+import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
+import type { HttpClientError } from "effect/unstable/http/HttpClientError";
 
-function extractLinkValue(linkHeaderValue: string): URL | null {
+function extractLinkValue(linkHeaderValue: string): Option.Option<URL> {
     const match = linkHeaderValue.match(/<([^>]+)>/);
     if (match && match[1]) {
-        return new URL(match[1]);
+        return Option.some(new URL(match[1]));
     } else {
-        return null;
+        return Option.none();
     }
 }
 
-const RetryPolicy = Schedule.identity<HttpClientError>().pipe(
-    Schedule.addDelayEffect((err) => Effect.gen(function* () {
-        if (err._tag === "ResponseError" && err.response.status === 429) {
-            const retrySec = parseInt(err.response.headers["retry-after"]!, 10);
-            yield* Effect.logWarning(`Freshservice returned 429 response. Retry (sec): ${retrySec}`);
-            return Duration.seconds(retrySec);
-        }
-        return "0 millis";
-    }))
-);
+function removeOrigin(url: URL): string {
+    return url.pathname + url.search;
+}
 
-type StreamFactoryArgs<Dec, Enc> = {
-    path: string;
-    queryParams?: ConstructorParameters<typeof URLSearchParams>[0];
-    schema: S.Schema<Dec, Enc>;
-};
+interface FreshServiceConfigOpts {
+    baseURL: string;
+    token: string | Redacted.Redacted<string>;
+}
 
-export class FreshServiceConfig extends Context.Tag("effect-services/FreshService/index/FreshServiceConfig")<FreshServiceConfig, {
-    readonly baseURL: URL;
-    readonly token: Redacted.Redacted<string>;
-}>(){}
+class FreshServiceConfig extends Context.Service<FreshServiceConfig, FreshServiceConfigOpts>()("effect-services/freshservice/new/FreshServiceConfig") { }
 
-export class Freshservice extends Effect.Service<Freshservice>()("Freshservice", {
-    effect: Effect.gen(function* () {
+const FreshServiceConfigLayer = (opts: FreshServiceConfigOpts) => Layer.succeed(FreshServiceConfig, opts);
+
+const handleRetry = Effect.fnUntraced(function* (err: HttpClientError) {
+    if (err.response?.status === 429) {
+        const retrySecs = parseInt(err.response.headers["retry-after"]!, 10);
+        yield* Effect.logWarning(`Freshservice returned 429 response. Retry (sec): ${retrySecs}`);
+        return Duration.seconds(retrySecs);
+    }
+    return Duration.zero;
+});
+
+/**
+ * A FreshService Service that returns an authenticated Effect HttpClient.
+ * Handles rate limiting. Will throw on other 4xx and 5xx responses.
+ * 
+ * Comes with a MakeStream utility method to automatically traverse API paganition
+ * as an Effect Stream.
+ */
+export class FreshService extends Context.Service<FreshService>()("effect-services/freshservice/new/FreshService", {
+    make: Effect.gen(function* () {
         const config = yield* FreshServiceConfig;
-        const baseURL = config.baseURL;
-        const token = `Basic ${Redacted.value(config.token)}`;
 
-        const FS_Layer = FetchHttpClient.layer.pipe(
-            Layer.provide(
-                Layer.succeed(FetchHttpClient.RequestInit, {
-                    headers: {
-                        "Authorization": token,
-                    },
-                })
-            )
+        const token = Redacted.isRedacted(config.token)
+            ? Redacted.value(config.token)
+            : config.token;
+
+        const RetryPolicy = Schedule.identity<HttpClientError>().pipe(
+            Schedule.addDelay((e) => handleRetry(e))
         );
 
-        const client = yield* pipe(
-            HttpClient.HttpClient,
-            Effect.provide(FS_Layer),
+        const client = (yield* HttpClient.HttpClient).pipe(
+            HttpClient.mapRequest(flow(
+                HttpClientRequest.prependUrl(config.baseURL),
+                HttpClientRequest.setHeader("Authorization", `Basic ${token}`),
+                HttpClientRequest.acceptJson,
+            )),
+            HttpClient.filterStatusOk,
+            HttpClient.retryTransient({
+                retryOn: "errors-only",
+                schedule: RetryPolicy
+            }),
         );
 
-        const generateStream = <D, E>(
-            args: StreamFactoryArgs<D, E>
+        const GenericListSchema = Schema.Record(Schema.String, Schema.Array(Schema.Unknown));
+        const decode = Schema.decodeUnknownEffect(GenericListSchema);
+    
+
+        const MakeStream = (
+            path: string,
+            queryParams?: ConstructorParameters<typeof URLSearchParams>[0]
         ) => Effect.gen(function* () {
-            // link header value example (null if last page):
-            // "<https://hcrlaw.freshservice.com/api/v2/tickets?page=2>; rel=\"next\""
 
-            const {
-                path,
-                queryParams,
-                schema,
-            } = args;
-
-            const initialURL = new URL(path, baseURL);
+            const initialURL = new URL(path, config.baseURL);
 
             if (queryParams) {
-                initialURL.search = new URLSearchParams(queryParams).toString();
+                initialURL.search = new URLSearchParams(queryParams).toString()
             }
 
             initialURL.searchParams.set("per_page", "100");
 
-            const decode = HttpClientResponse.schemaBodyJson(schema);
+            // URL without origin (origin is already set in client)
 
-            const stream = Stream.paginateEffect(
-                initialURL,
-                (currentURL) => Effect.gen(function* () {
-                    yield* Effect.log(currentURL.toString());
+            const stream = Stream.paginate(initialURL, (currentURL) => Effect.gen(function* () {
+                yield* Effect.logDebug("FreshService Stream URL:", currentURL);
 
-                    const response = yield* client.get(currentURL).pipe(
-                        Effect.flatMap(HttpClientResponse.filterStatus((res) => res !== 429)),
-                        Effect.retry(RetryPolicy)
-                    );                    
+                const response = yield* client.get(removeOrigin(currentURL));
+                const json = yield* response.json;
 
-                    const decoded = yield* decode(response);
+                const validated = yield* decode(json);
 
-                    const linkHeader = response.headers["link"];
-                    const nextUrl = linkHeader ? extractLinkValue(linkHeader) : null;
+                const key = Object.keys(validated)[0]!;
+                const responseArr = validated[key]!;
 
-                    // Return the decoded data and optional next URL
-                    // When nextUrl is null, returns Option.none() to stop pagination
-                    return [decoded, Option.fromNullable(nextUrl)];
-                }),
-            ).pipe(
-                Stream.onEnd(Effect.log(`Stream complete for ${args.path}`))
-            );
+                const linkHeader = response.headers["link"];
 
+                const nextURL = linkHeader ? extractLinkValue(linkHeader) : Option.none();
+
+                return [responseArr, nextURL];
+            }));
             return stream;
-        });
+        })
 
         return {
-            baseURL,
             client,
-            generateStream,
-        };
-    }).pipe(
-        Effect.provide(FetchHttpClient.layer)
-    ),
-}) { };
+            MakeStream,
+        }
+
+    })
+}) {
+    static readonly layer = (opts: FreshServiceConfigOpts) => Layer.effect(this, this.make).pipe(
+        Layer.provide(FetchHttpClient.layer),
+        Layer.provide(FreshServiceConfigLayer(opts))
+    );
+}
