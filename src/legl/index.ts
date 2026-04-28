@@ -1,51 +1,44 @@
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Stream from "effect/Stream";
-import * as Option from "effect/Option";
-import * as Either from "effect/Either";
-import * as Context from "effect/Context";
-import * as R from "effect/Redacted";
-import { FetchHttpClient, HttpClient, HttpClientResponse } from '@effect/platform';
+import { Effect, Context, type Redacted, flow, Schedule, Stream, Option, Layer } from 'effect';
+import { removeOrigin, unwravel, type SearchParamInput } from "../internals/helpers";
+import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/unstable/http';
 import { LeglPaginationFieldsWithResult } from "./schema";
 
-type StreamArgs = {
-    path: string;
-    queryParams?: ConstructorParameters<typeof URLSearchParams>[0];
+interface LeglConfigOpts {
+    baseURL: URL | string;
+    bearerToken: Redacted.Redacted<string> | string;
 }
 
-export class LeglConfig extends Context.Tag("effect-services/Legl/index/LeglConfig")<LeglConfig, {
-    readonly baseURL: URL;
-    readonly bearerToken: R.Redacted<string>;
-}>(){}
+class LeglConfig extends Context.Service<LeglConfig, LeglConfigOpts>()("effect-services/legl/new/LeglConfig"){}
 
-export class LeglService extends Effect.Service<LeglService>()("effect-services/Legl/index/LeglService", {
-    effect: Effect.gen(function* () {
-        const conf = yield* LeglConfig;
-        const baseURL = conf.baseURL;
+const LeglConfigLayer = (opts: LeglConfigOpts) => Layer.succeed(LeglConfig, opts);
 
-        const HttpLayer = FetchHttpClient.layer.pipe(
-            Layer.provide(
-                Layer.succeed(FetchHttpClient.RequestInit, {
-                    headers: {
-                        "authorization": `Token ${R.value(conf.bearerToken)}`,
-                    }
-                })
-            )
+export class Legl extends Context.Service<Legl>()("effect-services/legl/new/Legl", { 
+    make: Effect.gen(function* () {
+        const config = yield* LeglConfig;
+        const token = unwravel(config.bearerToken);
+        const baseURL = config.baseURL.toString();
+
+        const RetrySchedule = Schedule.exponential("1 second").pipe(Schedule.both(Schedule.recurs(5)));
+
+        const client = (yield* HttpClient.HttpClient).pipe(
+            HttpClient.mapRequest(flow(
+                HttpClientRequest.prependUrl(baseURL),
+                HttpClientRequest.setHeader("authorization", `Token ${token}`)
+            )),
+            HttpClient.filterStatusOk,
+            HttpClient.retryTransient({
+                retryOn: "errors-only",
+                schedule: RetrySchedule,
+                while: ((e) => e.response?.status === 429)
+            })
         );
 
-        const client = yield* HttpClient.HttpClient.pipe(
-            Effect.provide(HttpLayer)
-        );
-
-        const StreamFactory = (
-            args: StreamArgs
+        const MakeStream = (
+            path: string,
+            queryParams?: SearchParamInput
         ) => Effect.gen(function* () {
-            const {
-                path,
-                queryParams,
-            } = args;
-
-            const initialURL = new URL(path, baseURL);
+            
+            const initialURL = new URL(path, config.baseURL);
 
             if (queryParams) {
                 initialURL.search = new URLSearchParams(queryParams).toString();
@@ -53,42 +46,25 @@ export class LeglService extends Effect.Service<LeglService>()("effect-services/
 
             const decode = HttpClientResponse.schemaBodyJson(LeglPaginationFieldsWithResult);
 
-            const stream = Stream.unfoldEffect(
-                initialURL,
-                (currentUrl) => Effect.gen(function* () {
-                    if (!currentUrl) return Option.none();
+            const stream = Stream.paginate(initialURL, (currentURL) => Effect.gen(function* () {
+                const response = yield* client.get(removeOrigin(currentURL));
+                const json = yield* decode(response);
 
-                    yield* Effect.log(currentUrl.toString());
-                    const response = yield* client.get(currentUrl);
-                    const decoded = yield* Effect.either(decode(response));
+                const nextURL = json.next ? Option.some(json.next) : Option.none();
 
-                    if (Either.isLeft(decoded)) {
-                        yield* Effect.logError(decoded.left.message);
-                        if (decoded.left._tag === "ParseError") {
-                            yield* Effect.log("Actual:", decoded.left.issue.actual);
-                        }
-                        return Option.none();
-                    }
-
-                    const nextUrl = decoded.right.next;
-
-                    return Option.some([
-                        decoded.right,
-                        nextUrl!,
-                    ]);
-                })
-            ).pipe(
-                Stream.onEnd(Effect.log(`Legl stream complete`)),
-                Stream.withSpan(args.path),
-            );
+                return [json.results, nextURL];
+            }));
 
             return stream;
         });
 
         return {
             client,
-            baseURL,
-            StreamFactory,
-        }
-    }).pipe(Effect.provide(FetchHttpClient.layer)),
-}) { }
+            MakeStream,
+        };
+    })
+}){
+    static readonly layer = (opts: LeglConfigOpts) => Layer.effect(this, this.make).pipe(
+        Layer.provide(LeglConfigLayer(opts))
+    );
+}

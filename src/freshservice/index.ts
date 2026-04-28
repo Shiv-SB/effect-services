@@ -1,7 +1,7 @@
 import { Context, Duration, Effect, flow, Layer, Option, Redacted, Schedule, Schema, Stream } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import type { HttpClientError } from "effect/unstable/http/HttpClientError";
-import { unwravel } from "../internals/helpers";
+import { removeOrigin, unwravel, type SearchParamInput } from "../internals/helpers";
 
 function extractLinkValue(linkHeaderValue: string): Option.Option<URL> {
     const match = linkHeaderValue.match(/<([^>]+)>/);
@@ -10,10 +10,6 @@ function extractLinkValue(linkHeaderValue: string): Option.Option<URL> {
     } else {
         return Option.none();
     }
-}
-
-function removeOrigin(url: URL): string {
-    return url.pathname + url.search;
 }
 
 interface FreshServiceConfigOpts {
@@ -70,7 +66,7 @@ export class FreshService extends Context.Service<FreshService>()("effect-servic
 
         const MakeStream = (
             path: string,
-            queryParams?: ConstructorParameters<typeof URLSearchParams>[0]
+            queryParams?: SearchParamInput
         ) => Effect.gen(function* () {
 
             const initialURL = new URL(path, config.baseURL);
