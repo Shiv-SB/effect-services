@@ -1,4 +1,4 @@
-import { Context, Duration, Effect, Layer, Redacted, Schedule, Stream, flow } from 'effect';
+import { Context, Duration, Effect, Layer, Schedule, Stream, flow } from 'effect';
 import { type CosmosSDKConfigOpts } from "./CosmosSDK";
 import { CosmosClient as _client, ErrorResponse, type ItemDefinition, type SqlQuerySpec } from "@azure/cosmos";
 import { CosmosError } from "./common";
