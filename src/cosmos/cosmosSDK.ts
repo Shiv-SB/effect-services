@@ -56,9 +56,3 @@ export class CosmosClientSDK extends Context.Service<CosmosClientSDK>()("effect-
         Layer.provide(CosmosSDKConfigLayer(opts))
     )
 }
-
-Effect.fn(function* () {
-    const c = yield* CosmosClientSDK;
-    const f = yield* c.use((c) => c.getReadEndpoint());
-    yield* Effect.log(f);
-});
