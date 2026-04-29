@@ -1,33 +1,25 @@
-import * as Effect from "effect/Effect";
-import * as Cron from "effect/Cron";
-import * as S from "effect/Schema";
-import * as Either from "effect/Either";
-import * as Data from "effect/Data";
-import * as Schedule from "effect/Schedule";
+import { Effect, Schema as S, Cron, Schedule, Data, Result } from "effect";
 import { Validator } from "../internals/cli";
 
 const CronSchema = S.declare(
     (input: unknown): input is Cron.Cron => Cron.isCron(input)
-).annotations({
-    message: (_issue) => `Expected type Cron.Cron`
+).annotate({
+    message: "Expected type Cron.Cron"
 });
 
-const CronSchemas = S.Union(
-    S.Array(CronSchema),
+const CronSchemas = S.Union([
+    S.mutable(S.Array(CronSchema)),
     CronSchema,
-).pipe(S.mutable)
-    .annotations({
-        identifier: "Cron or Cron Tuple"
-    });
+]).annotate({
+    identifier: "Cron or Cron Tuple"
+});
 
-const funcArgSchema = S.Record({
-    key: S.String,
-    value: CronSchemas
-}).annotations({
+const funcArgSchema = S.Record(S.String, CronSchemas).annotate({
     identifier: "ScheduleCronComposer Args",
 });
 
 type ScheduleMapping<T extends string> = Record<T, typeof CronSchemas.Type>;
+type ScheduleMappingProp = typeof CronSchemas.Type;
 
 export class ScheduleCronComposerError extends Data.TaggedError("ScheduleCronComposerError")<{
     cause?: unknown;
@@ -51,9 +43,9 @@ type ScheduleCronComposerReturnType<T extends string> = Effect.Effect<
  * // index.ts
  * const Main = Effect.gen(function* () {
  *  const schedules = yield* ScheduleCronComposer({
- *      job1: Cron.unsafeParse("0 5 * * *"),
- *      job2: [Cron.unsafeParse("30 4 * * 4"), Cron.unsafeParse("0 23 * * 1-3")],
- *      job3: Cron.unsafeParse("* 12 * * *"),
+ *      job1: Cron.parseUnsafe("0 5 * * *"),
+ *      job2: [Cron.parseUnsafe("30 4 * * 4"), Cron.parseUnsafe("0 23 * * 1-3")],
+ *      job3: Cron.parseUnsafe("* 12 * * *"),
  *  });
  * 
  *  const job1 = Effect.succeed("foo!").pipe(Effect.schedule(schedules.job1));
@@ -82,13 +74,13 @@ export const ScheduleCronComposer = <T extends string>(
     flag: `-${string}` = "-c",
 ): ScheduleCronComposerReturnType<T> => Effect.gen(function* () {
     // #region Validation
-    const validate = S.decodeEither(funcArgSchema, { exact: true });
+    const validate = S.decodeResult(funcArgSchema);
     const validateResult = validate(scheduleMapping);
 
-    if (Either.isLeft(validateResult)) {
+    if (Result.isFailure(validateResult)) {
         return yield* new ScheduleCronComposerError({
             reason: "INVALID_FUNC_ARGS",
-            cause: validateResult.left,
+            cause: validateResult.failure,
         });
     }
 
@@ -110,15 +102,15 @@ export const ScheduleCronComposer = <T extends string>(
 
     // #region Merge Schedules
 
-    const defaultSchedules = {} as Record<T, Schedule.Schedule<unknown>>;
+    const defaultSchedules = {} as Record<T, Schedule.Schedule<unknown, unknown, unknown, unknown>>;
     const nextMappings: Map<T, Date[]> = new Map();
 
     for (const name of names) {
-        const rawSchedule = scheduleMapping[name];
+        const rawSchedule: ScheduleMappingProp = scheduleMapping[name];
         const nextArr: Date[] = [];
         if (Array.isArray(rawSchedule)) {
             const len = rawSchedule.length;
-            let merged: Schedule.Schedule<unknown> = Schedule.cron(rawSchedule[0]!);
+            let merged: Schedule.Schedule<unknown, unknown, unknown> = Schedule.cron(rawSchedule[0]!);
             for (let i = 0; i < len; i++) {
                 const curr = rawSchedule[i]!;
                 const next = Cron.next(curr);
@@ -127,7 +119,7 @@ export const ScheduleCronComposer = <T extends string>(
                     defaultSchedules[name] = Schedule.cron(rawSchedule[0]!);
                     break;
                 }
-                merged = Schedule.union(merged, Schedule.cron(curr));
+                merged = Schedule.both(merged, Schedule.cron(curr));
             }
             defaultSchedules[name] = merged;
             nextMappings.set(name, nextArr);
@@ -142,7 +134,8 @@ export const ScheduleCronComposer = <T extends string>(
     const isNow = validationResult.longFlags.includes("now");
     const selectedJobs = validationResult.args;
     const anyJobFlag = selectedJobs.length > 0;
-    const DontRun = Schedule.recurWhile(() => false);
+    const DontRun = Schedule.recurs(-1);
+    const runOnce = Schedule.recurs(1);
 
     if (!anyJobFlag) {
         yield* Effect.log("Running with default Cron Schedules");
@@ -156,7 +149,7 @@ export const ScheduleCronComposer = <T extends string>(
 
         // Case 2: now only → all jobs once
         if (isNow && !anyJobFlag) {
-            return [name, Schedule.once];
+            return [name, runOnce];
         }
 
         // Case 3 & 4: job selection involved
@@ -164,7 +157,7 @@ export const ScheduleCronComposer = <T extends string>(
             if (selectedJobs.includes(name)) {
                 return [
                     name,
-                    isNow ? Schedule.once : defaultSchedules[name],
+                    isNow ? runOnce : defaultSchedules[name],
                 ];
             } else {
                 return [name, DontRun];
@@ -183,7 +176,7 @@ export const ScheduleCronComposer = <T extends string>(
 
         if (schedule === DontRun) {
             mode = "DISABLED";
-        } else if (schedule === Schedule.once) {
+        } else if (schedule === runOnce) {
             mode = "RUN ONCE (immediate)";
         } else {
             const cron = nextMappings.get(name)!;
@@ -202,22 +195,19 @@ export const ScheduleCronComposer = <T extends string>(
 }).pipe(
     Effect.withLogSpan("Schedule Composer"),
 );
-/*
-import { Logger } from "effect";
+
 Effect.gen(function* () {
     const schedules = yield* ScheduleCronComposer({
-        users: [Cron.unsafeParse("5 4 * * *"), Cron.unsafeParse("0 23 * * *")],
+        users: [Cron.parseUnsafe("5 4 * * *"), Cron.parseUnsafe("0 23 * * *")],
         sessions: [
-            Cron.unsafeParse("5 4 * * *"),
-            Cron.unsafeParse("0 * * * *"),
-            Cron.unsafeParse("15 12 5 * *"),
+            Cron.parseUnsafe("5 4 * * *"),
+            Cron.parseUnsafe("0 * * * *"),
+            Cron.parseUnsafe("15 12 5 * *"),
         ],
-        offices: Cron.unsafeParse("0 0 * 4 *"),
-        incidents: [Cron.unsafeParse("0 19 * * 6")],
+        offices: Cron.parseUnsafe("0 0 * 4 *"),
+        incidents: [Cron.parseUnsafe("0 19 * * 6")],
     });
     yield* Effect.log("Users", schedules.users);
 }).pipe(
-    Effect.provide(Logger.pretty),
     Effect.runPromise,
 );
-*/
