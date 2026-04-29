@@ -1,5 +1,5 @@
 import { Context, Effect, Layer } from "effect";
-import type { CosmosSDKConfigOpts } from "./CosmosSDK"
+import type { CosmosSDKConfigOpts } from "./cosmosSDK";
 import type { Container } from "@azure/cosmos";
 import { CosmosError } from "./common";
 import { CosmosClient as _client } from "@azure/cosmos";
