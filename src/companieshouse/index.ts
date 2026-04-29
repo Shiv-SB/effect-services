@@ -27,7 +27,7 @@ const ConfigLayer = (opts: ConfigOpts) => Layer.succeed(Config, opts);
 
 /**
  * An Effectful, lightweight wrapper for the Companies House SDK.
- * Uses @companieshouse/api-sdk-node version: COMPANIES_HOUSE_VERSION
+ * Uses @companieshouse/api-sdk-node.
  */
 export class CompaniesHouse extends Context.Service<CompaniesHouse>()("CompaniesHouse", {
     make: Effect.gen(function* () {

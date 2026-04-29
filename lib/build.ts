@@ -52,10 +52,6 @@ async function deleteBuildFolder() {
     await fs.rm("build", { recursive: true, force: true });
 }
 
-function getDepVersion(name: keyof typeof pkg.dependencies): string {
-    return JSON.stringify(pkg.dependencies[name]);
-}
-
 function getArgs() {
     const allowedArgs = [
         "cicd",
@@ -162,11 +158,7 @@ const build = await Bun.build({
     splitting: true,
     sourcemap: "none",
     format: "esm",
-    target: "node",
-    define: {
-        COMPANIES_HOUSE_VERSION: getDepVersion("@companieshouse/api-sdk-node"),
-        COSMOS_VERSION: getDepVersion("@azure/cosmos"),
-    }
+    target: "bun",
 });
 
 const end = performance.now();
