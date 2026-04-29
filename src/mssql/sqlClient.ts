@@ -51,7 +51,7 @@ export class MsSqlClient extends Context.Service<MsSqlClient>()("effect-services
         }
 
     })
-}){
+}) {
     static readonly layer = (opts: MsSqlConfigOpts) => Layer.effect(this, this.make).pipe(
         Layer.provide(MsSqlConfigLayer(opts))
     );

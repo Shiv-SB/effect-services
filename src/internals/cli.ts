@@ -36,7 +36,7 @@ export const Validator = <A extends string, L extends string>(
     const args = Bun.argv.slice(2);
 
     const defaultLongFlags = ["help", "version"] as const;
-    type DLF = typeof defaultLongFlags[number]; 
+    type DLF = typeof defaultLongFlags[number];
 
     const collectedArgs: A[] = [];
     const collectedLongFlags: L[] = [];

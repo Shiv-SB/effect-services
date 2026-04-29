@@ -48,7 +48,7 @@ export class MsSqlSDK extends Context.Service<MsSqlSDK>()("effect-services/mssql
         }
         return caller;
     })
-}){
+}) {
     static readonly layer = (opts: MsSqlConfigOpts) => Layer.effect(this, this.make).pipe(
         Layer.provide(MsSqlConfigLayer(opts))
     );

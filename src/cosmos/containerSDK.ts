@@ -10,7 +10,7 @@ interface ContainerConfigOpts extends CosmosSDKConfigOpts {
     containerID: string;
 }
 
-class ContainerConfig extends Context.Service<ContainerConfig, ContainerConfigOpts>()("effect-services/cosmos/containerSDK/ContainerConfig"){}
+class ContainerConfig extends Context.Service<ContainerConfig, ContainerConfigOpts>()("effect-services/cosmos/containerSDK/ContainerConfig") { }
 
 const ContainerConfigLayer = (opts: ContainerConfigOpts) => Layer.succeed(ContainerConfig, opts);
 
@@ -59,7 +59,7 @@ export class ContainerClientSDK extends Context.Service<ContainerClientSDK>()("e
         };
         return caller;
     })
-}){
+}) {
     static readonly layer = (opts: ContainerConfigOpts) => Layer.effect(this, this.make).pipe(
         Layer.provide(ContainerConfigLayer(opts))
     )

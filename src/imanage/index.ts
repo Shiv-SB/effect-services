@@ -18,7 +18,7 @@ interface ImanageConfigOpts {
     library: "LIVE" | "DEV" | (string & {});
 }
 
-export class ImanageConfig extends Context.Service<ImanageConfig, ImanageConfigOpts>()("effect-services/imanage/index/ImanageConfig"){}
+export class ImanageConfig extends Context.Service<ImanageConfig, ImanageConfigOpts>()("effect-services/imanage/index/ImanageConfig") { }
 
 const ImanageConfigLayer = (opts: ImanageConfigOpts) => Layer.succeed(ImanageConfig, opts);
 
@@ -32,7 +32,7 @@ const authenticate = Effect.gen(function* () {
         client_id: conf.client_id,
         client_secret: unravel(conf.client_secret),
     }
-    
+
     const unauthedClient = (yield* HttpClient.HttpClient);
 
     const url = new URL("/auth/oauth2/token", conf.baseURL);
@@ -114,9 +114,9 @@ export class ImanageService extends Context.Service<ImanageService>()("effect-se
             docProfile: typeof UploadDocumentRequestSchema.Encoded;
         }) => Effect.gen(function* () {
             const { docProfile, folderID, file } = args;
-        
+
             const url = new URL(`${helperPath}/folders/${folderID}/documents`);
-            
+
             const formData = new FormData();
             formData.append("profile", new Blob([JSON.stringify(docProfile)], { type: "application/json" }));
             formData.append("file", new Blob([file]));

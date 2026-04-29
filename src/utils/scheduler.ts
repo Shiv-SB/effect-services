@@ -85,7 +85,7 @@ export const ScheduleCronComposer = <T extends string>(
     }
 
     const names = Object.keys(scheduleMapping) as T[];
-    
+
     const validationResult: {
         args: T[];
         longFlags: "now"[];

@@ -8,11 +8,11 @@ interface LeglConfigOpts {
     bearerToken: Redacted.Redacted<string> | string;
 }
 
-class LeglConfig extends Context.Service<LeglConfig, LeglConfigOpts>()("effect-services/legl/index/LeglConfig"){}
+class LeglConfig extends Context.Service<LeglConfig, LeglConfigOpts>()("effect-services/legl/index/LeglConfig") { }
 
 const LeglConfigLayer = (opts: LeglConfigOpts) => Layer.succeed(LeglConfig, opts);
 
-export class Legl extends Context.Service<Legl>()("effect-services/legl/index/Legl", { 
+export class Legl extends Context.Service<Legl>()("effect-services/legl/index/Legl", {
     make: Effect.gen(function* () {
         const config = yield* LeglConfig;
         const token = unravel(config.bearerToken);
@@ -37,7 +37,7 @@ export class Legl extends Context.Service<Legl>()("effect-services/legl/index/Le
             path: string,
             queryParams?: SearchParamInput
         ) => Effect.gen(function* () {
-            
+
             const initialURL = new URL(path, config.baseURL);
 
             if (queryParams) {
@@ -63,7 +63,7 @@ export class Legl extends Context.Service<Legl>()("effect-services/legl/index/Le
             MakeStream,
         };
     })
-}){
+}) {
     static readonly layer = (opts: LeglConfigOpts) => Layer.effect(this, this.make).pipe(
         Layer.provide(LeglConfigLayer(opts))
     );

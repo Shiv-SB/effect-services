@@ -62,7 +62,7 @@ export class FreshService extends Context.Service<FreshService>()("effect-servic
 
         const GenericListSchema = Schema.Record(Schema.String, Schema.Array(Schema.Unknown));
         const decode = Schema.decodeUnknownEffect(GenericListSchema);
-    
+
 
         const MakeStream = (
             path: string,

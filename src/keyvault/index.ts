@@ -67,7 +67,7 @@ export class KeyVault extends Context.Service<KeyVault>()("effect-services/keyva
 
 export type CacheOptions = Omit<Parameters<typeof Cache["make"]>[0], "lookup">;
 
-export class KeyVaultAsCache extends Context.Service<KeyVaultAsCache>()("effect-services/keyvault/index/KeyVaultAsCache", { 
+export class KeyVaultAsCache extends Context.Service<KeyVaultAsCache>()("effect-services/keyvault/index/KeyVaultAsCache", {
     make: Effect.fn(function* (options: CacheOptions) {
         const kv = yield* KeyVault;
         const cache = yield* Cache.make({
@@ -76,7 +76,7 @@ export class KeyVaultAsCache extends Context.Service<KeyVaultAsCache>()("effect-
         });
         return cache;
     })
-}){
+}) {
     static readonly layer = (cacheOptions: CacheOptions) => Layer.effect(this, this.make(cacheOptions))
 }
 

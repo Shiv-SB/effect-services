@@ -129,7 +129,7 @@ export class CompaniesHouseClient extends Context.Service<CompaniesHouseClient>(
 
         return client;
     })
-}) { 
+}) {
     static readonly layer = (opts: ClientConfigOpts) => Layer.effect(this, this.make).pipe(
         Layer.provideMerge(ClientConfigLayer(opts)),
         Layer.provideMerge(FetchHttpClient.layer),

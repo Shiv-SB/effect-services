@@ -8,7 +8,7 @@ interface CosmosClientConfigOpts extends CosmosSDKConfigOpts {
     databaseID: string;
 }
 
-export class CosmosClientConfig extends Context.Service<CosmosClientConfig, CosmosClientConfigOpts>()("effect-services/cosmos/customClient/CosmosClientConfig"){}
+export class CosmosClientConfig extends Context.Service<CosmosClientConfig, CosmosClientConfigOpts>()("effect-services/cosmos/customClient/CosmosClientConfig") { }
 
 const CosmosConfigLayer = (opts: CosmosClientConfigOpts) => Layer.succeed(CosmosClientConfig, opts);
 

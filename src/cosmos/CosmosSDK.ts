@@ -8,7 +8,7 @@ export interface CosmosSDKConfigOpts {
     connectionString: string | Redacted.Redacted<string>;
 }
 
-export class CosmosSDKConfig extends Context.Service<CosmosSDKConfig, CosmosSDKConfigOpts>()("effect-services/cosmos/cosmosSDK/CosmosSDKConfig"){}
+export class CosmosSDKConfig extends Context.Service<CosmosSDKConfig, CosmosSDKConfigOpts>()("effect-services/cosmos/cosmosSDK/CosmosSDKConfig") { }
 
 const CosmosSDKConfigLayer = (opts: CosmosSDKConfigOpts) => Layer.succeed(CosmosSDKConfig, opts);
 
@@ -21,10 +21,10 @@ interface CosmosSdkImpl {
 export class CosmosClientSDK extends Context.Service<CosmosClientSDK>()("effect-services/cosmos/cosmosSDK/CosmosClientSDK", {
     make: Effect.gen(function* () {
         const c = yield* CosmosSDKConfig;
-        
+
         const client = new _client(unravel(c.connectionString));
 
-        const caller: CosmosSdkImpl =  {
+        const caller: CosmosSdkImpl = {
             use: (fn) => Effect.gen(function* () {
                 const result = yield* Effect.try({
                     try: () => fn(client),
@@ -51,7 +51,7 @@ export class CosmosClientSDK extends Context.Service<CosmosClientSDK>()("effect-
         };
         return caller;
     })
-}){
+}) {
     static readonly layer = (opts: CosmosSDKConfigOpts) => Layer.effect(this, this.make).pipe(
         Layer.provide(CosmosSDKConfigLayer(opts))
     )

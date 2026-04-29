@@ -1,11 +1,11 @@
 import type { TokenCredential } from "@azure/identity";
-import { 
+import {
     ShareDirectoryClient,
     ShareFileClient,
-    ShareServiceClient, 
-    StorageSharedKeyCredential, 
-    type DirectoryItem, 
-    type FileItem 
+    ShareServiceClient,
+    StorageSharedKeyCredential,
+    type DirectoryItem,
+    type FileItem
 } from "@azure/storage-file-share";
 import { Context, Data, Effect, Layer, Option, Queue, Stream } from "effect";
 
@@ -14,14 +14,14 @@ interface AzureFsSdkConfigOpts {
     credential: TokenCredential | StorageSharedKeyCredential;
 }
 
-class AzureFsSdkConfig extends Context.Service<AzureFsSdkConfig, AzureFsSdkConfigOpts>()("AzureFsSdkConfig") {}
+class AzureFsSdkConfig extends Context.Service<AzureFsSdkConfig, AzureFsSdkConfigOpts>()("AzureFsSdkConfig") { }
 
 const AzureFsSdkConfigLayer = (opts: AzureFsSdkConfigOpts) => Layer.succeed(AzureFsSdkConfig, opts);
 
 export class AzureFsSdkError extends Data.TaggedError("AzureFsSdkError")<{
     message: string;
     cause?: unknown;
-}> {};
+}> { };
 
 interface AzureFsSdkImpl {
     use: <T>(
@@ -105,7 +105,7 @@ export const ToStream = Effect.gen(function* () {
             Queue.offerUnsafe(q, Option.some(value));
             ({ done, value } = yield* getNext);
         }
-        
+
         Queue.endUnsafe(q);
     }).pipe(Effect.catch((e) => Effect.gen(function* () {
         yield* Effect.logError("Unable to complete stream", e);

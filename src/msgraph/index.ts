@@ -7,7 +7,7 @@ import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-grap
 export class MsGraphError extends Data.TaggedError("MsGraphError")<{
     cause?: unknown;
     message: string;
-}>{}
+}> { }
 
 interface MsGraphImpl {
     use: <T>(
@@ -22,7 +22,7 @@ interface MsGraphConfigOpts {
     readonly scopes: string[];
 }
 
-class MsGraphConfig extends Context.Service<MsGraphConfig, MsGraphConfigOpts>()("effect-services/msgraph/index/MsGraphConfig"){}
+class MsGraphConfig extends Context.Service<MsGraphConfig, MsGraphConfigOpts>()("effect-services/msgraph/index/MsGraphConfig") { }
 
 const MsGraphConfigLayer = (opts: MsGraphConfigOpts) => Layer.succeed(MsGraphConfig, opts);
 
@@ -64,7 +64,7 @@ export class MsGraph extends Context.Service<MsGraph>()("effect-services/msgraph
         }
         return caller;
     })
-}){
+}) {
     static readonly layer = (opts: MsGraphConfigOpts) => Layer.effect(this, this.make).pipe(
         Layer.provide(MsGraphConfigLayer(opts))
     )
