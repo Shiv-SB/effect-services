@@ -22,7 +22,7 @@ interface ContainerSdkImpl {
 
 /**
  * A lightweight, Effectful wrapper for the Cosmos Container Client.
- * Uses @azure/cosmos.
+ * Uses `@azure/cosmos`.
  */
 export class ContainerClientSDK extends Context.Service<ContainerClientSDK>()("effect-services/cosmos/containerSDK/ContainerClientSDK", {
     make: Effect.gen(function* () {

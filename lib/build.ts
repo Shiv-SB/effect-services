@@ -156,7 +156,7 @@ const build = await Bun.build({
     minify: false,
     outdir: "build",
     splitting: true,
-    sourcemap: "none",
+    sourcemap: "inline",
     format: "esm",
     target: "bun",
 });

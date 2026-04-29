@@ -3,6 +3,8 @@ import { OauthResposneSchema, UploadDocumentRequestSchema } from "./schema";
 import { unravel } from "../internals/helpers";
 import { Context, Effect, Layer, Option, Redacted, Ref, Semaphore } from "effect";
 
+export * as schemas from "./schema";
+
 type OAuthToken = {
     accessToken: string;
     refreshToken: string | null;

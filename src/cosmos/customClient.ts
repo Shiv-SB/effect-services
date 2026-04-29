@@ -55,7 +55,10 @@ export class CosmosClient extends Context.Service<CosmosClient>()("effect-servic
                     cause: e,
                     message: "Error in allItems processing.",
                     source: "COSMOS_CLIENT",
-                }));
+                })).pipe(
+                    Stream.map((resp) => resp.resources),
+                    Stream.flattenIterable
+                );
                 return stream;
             });
 
@@ -79,7 +82,10 @@ export class CosmosClient extends Context.Service<CosmosClient>()("effect-servic
                     cause: e,
                     message: "Error in queryToStream processing.",
                     source: "COSMOS_CLIENT",
-                }));
+                })).pipe(
+                    Stream.map((resp) => resp.resources),
+                    Stream.flattenIterable,
+                );
                 return stream;
             });
 

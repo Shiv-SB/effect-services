@@ -20,7 +20,8 @@
     "@effect/language-service": "^0.85.1",
     "@types/bun": "1.3.13",
     "@types/mssql": "^12.3.0",
-    "ts-humanize": "^1.0.2"
+    "ts-humanize": "^1.0.2",
+    "effect": "^4.0.0-beta.59"
   },
   "peerDependencies": {
     "typescript": "^6.0.3",

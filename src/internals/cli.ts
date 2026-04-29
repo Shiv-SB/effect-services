@@ -33,8 +33,7 @@ export const Validator = <A extends string, L extends string>(
         .pipe(S.mutable)
         .annotate({ identifier: "Allowed Arguments" });
 
-    const isBun = process.versions["bun"] as string | undefined;
-    const args = (isBun ? Bun : process).argv.slice(2);
+    const args = process.argv.slice(2);
 
     const defaultLongFlags = ["help", "version"] as const;
     type DLF = typeof defaultLongFlags[number];

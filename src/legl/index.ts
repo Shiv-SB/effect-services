@@ -3,6 +3,8 @@ import { removeOrigin, unravel, type SearchParamInput } from "../internals/helpe
 import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/unstable/http';
 import { LeglPaginationFieldsWithResult } from "./schema";
 
+export * as schemas from "./schema";
+
 interface LeglConfigOpts {
     baseURL: URL | string;
     bearerToken: Redacted.Redacted<string> | string;

@@ -27,14 +27,14 @@ const ConfigLayer = (opts: ConfigOpts) => Layer.succeed(Config, opts);
 
 /**
  * An Effectful, lightweight wrapper for the Companies House SDK.
- * Uses @companieshouse/api-sdk-node.
+ * Uses `@companieshouse/api-sdk-node.`
  */
 export class CompaniesHouse extends Context.Service<CompaniesHouse>()("CompaniesHouse", {
     make: Effect.gen(function* () {
         const config = yield* Config;
         const client = createApiClient(config.apiKey);
 
-        return {
+        const caller: CompaniesHouseImpl = {
             use: (fn) => Effect.gen(function* () {
                 const result = yield* Effect.try({
                     try: () => fn(client),
@@ -56,7 +56,8 @@ export class CompaniesHouse extends Context.Service<CompaniesHouse>()("Companies
                     return result;
                 }
             })
-        } satisfies CompaniesHouseImpl;
+        };
+        return caller;
     })
 }) {
     static readonly layer = (args: ConfigOpts) => Layer.effect(this, this.make).pipe(

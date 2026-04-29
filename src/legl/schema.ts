@@ -108,7 +108,7 @@ const EngageRequestSchema = S.Struct({
     hidden_reference: S.NullOr(S.String),
 });
 
-export const ListEngangeReqestSchema = S.Struct({
+export const ListEngangeRequestSchema = S.Struct({
     ...LeglPaginationFields.fields,
     results: EngageRequestSchema,
 });
