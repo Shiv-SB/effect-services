@@ -196,6 +196,7 @@ export const ScheduleCronComposer = <T extends string>(
     Effect.withLogSpan("Schedule Composer"),
 );
 
+/*
 Effect.gen(function* () {
     const schedules = yield* ScheduleCronComposer({
         users: [Cron.parseUnsafe("5 4 * * *"), Cron.parseUnsafe("0 23 * * *")],
@@ -211,3 +212,4 @@ Effect.gen(function* () {
 }).pipe(
     Effect.runPromise,
 );
+*/
