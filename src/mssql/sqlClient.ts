@@ -2,7 +2,7 @@ import { Context, Effect, Layer, Stream } from "effect";
 import sql from "mssql";
 import { MsSqlConfig, MsSqlConfigLayer, MsSqlError, type MsSqlConfigOpts } from "./common";
 
-export class MsSqlClient extends Context.Service<MsSqlClient>()("effect-services/mssql/new/MsSql", {
+export class MsSqlClient extends Context.Service<MsSqlClient>()("effect-services/mssql/sqlClient/MsSql", {
     make: Effect.gen(function* () {
         const config = yield* MsSqlConfig;
 

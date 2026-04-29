@@ -1,6 +1,6 @@
 import { FetchHttpClient, HttpBody, HttpClient, HttpClientRequest, HttpClientResponse } from "effect/unstable/http";
 import { OauthResposneSchema, UploadDocumentRequestSchema } from "./schema";
-import { unwravel } from "../internals/helpers";
+import { unravel } from "../internals/helpers";
 import { Context, Effect, Layer, Option, Redacted, Ref, Semaphore } from "effect";
 
 type OAuthToken = {
@@ -18,7 +18,7 @@ interface ImanageConfigOpts {
     library: "LIVE" | "DEV" | (string & {});
 }
 
-export class ImanageConfig extends Context.Service<ImanageConfig, ImanageConfigOpts>()("effect-services/imanage/index/ImanageConfigService"){}
+export class ImanageConfig extends Context.Service<ImanageConfig, ImanageConfigOpts>()("effect-services/imanage/index/ImanageConfig"){}
 
 const ImanageConfigLayer = (opts: ImanageConfigOpts) => Layer.succeed(ImanageConfig, opts);
 
@@ -28,9 +28,9 @@ const authenticate = Effect.gen(function* () {
     const payload = {
         grant_type: "password",
         username: conf.username,
-        password: unwravel(conf.password),
+        password: unravel(conf.password),
         client_id: conf.client_id,
-        client_secret: unwravel(conf.client_secret),
+        client_secret: unravel(conf.client_secret),
     }
     
     const unauthedClient = (yield* HttpClient.HttpClient);
@@ -135,7 +135,7 @@ export class ImanageService extends Context.Service<ImanageService>()("effect-se
             uploadFile
         }
     })
-}){
+}) {
     static readonly layer = (opts: ImanageConfigOpts) => Layer.effect(this, this.make).pipe(
         Layer.provide(FetchHttpClient.layer),
         Layer.provide(ImanageConfigLayer(opts))

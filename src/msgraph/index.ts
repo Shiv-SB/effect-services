@@ -1,6 +1,6 @@
 import { Client, GraphRequest } from "@microsoft/microsoft-graph-client";
 import { Effect, Data, Context, Layer, Schema as S, Stream, Schedule, Option } from "effect";
-import { unwravel, type RedactedOr } from "../internals/helpers";
+import { unravel, type RedactedOr } from "../internals/helpers";
 import { ClientSecretCredential } from "@azure/identity";
 import { TokenCredentialAuthenticationProvider } from '@microsoft/microsoft-graph-client/authProviders/azureTokenCredentials';
 
@@ -22,17 +22,17 @@ interface MsGraphConfigOpts {
     readonly scopes: string[];
 }
 
-class MsGraphConfig extends Context.Service<MsGraphConfig, MsGraphConfigOpts>()("effect-services/msgraph/new/MsGraphConfig"){}
+class MsGraphConfig extends Context.Service<MsGraphConfig, MsGraphConfigOpts>()("effect-services/msgraph/index/MsGraphConfig"){}
 
 const MsGraphConfigLayer = (opts: MsGraphConfigOpts) => Layer.succeed(MsGraphConfig, opts);
 
-export class MsGraph extends Context.Service<MsGraph>()("effect-services/msgraph/new/MsGraph", {
+export class MsGraph extends Context.Service<MsGraph>()("effect-services/msgraph/index/MsGraph", {
     make: Effect.gen(function* () {
         const c = yield* MsGraphConfig;
         const credential = new ClientSecretCredential(
             c.tenantID,
             c.clientID,
-            unwravel(c.clientSecret),
+            unravel(c.clientSecret),
         );
 
         const authProvider = new TokenCredentialAuthenticationProvider(credential, { scopes: c.scopes });

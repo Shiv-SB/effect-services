@@ -1,7 +1,7 @@
 import { Context, Duration, Effect, flow, Layer, Option, Redacted, Schedule, Schema, Stream } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import type { HttpClientError } from "effect/unstable/http/HttpClientError";
-import { removeOrigin, unwravel, type SearchParamInput } from "../internals/helpers";
+import { removeOrigin, unravel, type SearchParamInput } from "../internals/helpers";
 
 function extractLinkValue(linkHeaderValue: string): Option.Option<URL> {
     const match = linkHeaderValue.match(/<([^>]+)>/);
@@ -17,7 +17,7 @@ interface FreshServiceConfigOpts {
     token: string | Redacted.Redacted<string>;
 }
 
-class FreshServiceConfig extends Context.Service<FreshServiceConfig, FreshServiceConfigOpts>()("effect-services/freshservice/new/FreshServiceConfig") { }
+class FreshServiceConfig extends Context.Service<FreshServiceConfig, FreshServiceConfigOpts>()("effect-services/freshservice/index/FreshServiceConfig") { }
 
 const FreshServiceConfigLayer = (opts: FreshServiceConfigOpts) => Layer.succeed(FreshServiceConfig, opts);
 
@@ -37,11 +37,11 @@ const handleRetry = Effect.fnUntraced(function* (err: HttpClientError) {
  * Comes with a MakeStream utility method to automatically traverse API paganition
  * as an Effect Stream.
  */
-export class FreshService extends Context.Service<FreshService>()("effect-services/freshservice/new/FreshService", {
+export class FreshService extends Context.Service<FreshService>()("effect-services/freshservice/index/FreshService", {
     make: Effect.gen(function* () {
         const config = yield* FreshServiceConfig;
 
-        const token = unwravel(config.token);
+        const token = unravel(config.token);
 
         const RetryPolicy = Schedule.identity<HttpClientError>().pipe(
             Schedule.addDelay((e) => handleRetry(e))

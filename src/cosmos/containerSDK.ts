@@ -1,16 +1,16 @@
 import { Context, Effect, Layer } from "effect";
-import type { CosmosSDKConfigOpts } from "./CosmosSDK";
+import type { CosmosSDKConfigOpts } from "./CosmosSDK"
 import type { Container } from "@azure/cosmos";
 import { CosmosError } from "./common";
 import { CosmosClient as _client } from "@azure/cosmos";
-import { unwravel } from "../internals/helpers";
+import { unravel } from "../internals/helpers";
 
 interface ContainerConfigOpts extends CosmosSDKConfigOpts {
     databaseID: string;
     containerID: string;
 }
 
-class ContainerConfig extends Context.Service<ContainerConfig, ContainerConfigOpts>()("effect-services/cosmos/new/ContainerConfig"){}
+class ContainerConfig extends Context.Service<ContainerConfig, ContainerConfigOpts>()("effect-services/cosmos/containerSDK/ContainerConfig"){}
 
 const ContainerConfigLayer = (opts: ContainerConfigOpts) => Layer.succeed(ContainerConfig, opts);
 
@@ -24,11 +24,11 @@ interface ContainerSdkImpl {
  * A lightweight, Effectful wrapper for the Cosmos Container Client.
  * Uses @azure/cosmos.
  */
-export class ContainerClientSDK extends Context.Service<ContainerClientSDK>()("effect-services/cosmos/new/ContainerClientSDK", {
+export class ContainerClientSDK extends Context.Service<ContainerClientSDK>()("effect-services/cosmos/containerSDK/ContainerClientSDK", {
     make: Effect.gen(function* () {
         const config = yield* ContainerConfig;
 
-        const client = new _client(unwravel(config.connectionString))
+        const client = new _client(unravel(config.connectionString))
             .database(config.databaseID)
             .container(config.containerID);
 

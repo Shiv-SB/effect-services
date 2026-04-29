@@ -2,13 +2,13 @@ import { type CosmosClient } from "@azure/cosmos";
 import { Context, Effect, Layer, Redacted } from "effect";
 import { CosmosClient as _client } from "@azure/cosmos";
 import { CosmosError } from "./common";
-import { unwravel } from "../internals/helpers";
+import { unravel } from "../internals/helpers";
 
 export interface CosmosSDKConfigOpts {
     connectionString: string | Redacted.Redacted<string>;
 }
 
-export class CosmosSDKConfig extends Context.Service<CosmosSDKConfig, CosmosSDKConfigOpts>()("effect-services/cosmos/new/CosmosSDKConfig"){}
+export class CosmosSDKConfig extends Context.Service<CosmosSDKConfig, CosmosSDKConfigOpts>()("effect-services/cosmos/cosmosSDK/CosmosSDKConfig"){}
 
 const CosmosSDKConfigLayer = (opts: CosmosSDKConfigOpts) => Layer.succeed(CosmosSDKConfig, opts);
 
@@ -18,11 +18,11 @@ interface CosmosSdkImpl {
     ) => Effect.Effect<Awaited<T>, CosmosError, never>
 }
 
-export class CosmosClientSDK extends Context.Service<CosmosClientSDK>()("effect-services/cosmos/new/CosmosClientSDK", {
+export class CosmosClientSDK extends Context.Service<CosmosClientSDK>()("effect-services/cosmos/cosmosSDK/CosmosClientSDK", {
     make: Effect.gen(function* () {
         const c = yield* CosmosSDKConfig;
         
-        const client = new _client(unwravel(c.connectionString));
+        const client = new _client(unravel(c.connectionString));
 
         const caller: CosmosSdkImpl =  {
             use: (fn) => Effect.gen(function* () {

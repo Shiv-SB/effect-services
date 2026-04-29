@@ -1,5 +1,5 @@
 import { Effect, Context, type Redacted, flow, Schedule, Stream, Option, Layer } from 'effect';
-import { removeOrigin, unwravel, type SearchParamInput } from "../internals/helpers";
+import { removeOrigin, unravel, type SearchParamInput } from "../internals/helpers";
 import { HttpClient, HttpClientRequest, HttpClientResponse } from 'effect/unstable/http';
 import { LeglPaginationFieldsWithResult } from "./schema";
 
@@ -8,14 +8,14 @@ interface LeglConfigOpts {
     bearerToken: Redacted.Redacted<string> | string;
 }
 
-class LeglConfig extends Context.Service<LeglConfig, LeglConfigOpts>()("effect-services/legl/new/LeglConfig"){}
+class LeglConfig extends Context.Service<LeglConfig, LeglConfigOpts>()("effect-services/legl/index/LeglConfig"){}
 
 const LeglConfigLayer = (opts: LeglConfigOpts) => Layer.succeed(LeglConfig, opts);
 
-export class Legl extends Context.Service<Legl>()("effect-services/legl/new/Legl", { 
+export class Legl extends Context.Service<Legl>()("effect-services/legl/index/Legl", { 
     make: Effect.gen(function* () {
         const config = yield* LeglConfig;
-        const token = unwravel(config.bearerToken);
+        const token = unravel(config.bearerToken);
         const baseURL = config.baseURL.toString();
 
         const RetrySchedule = Schedule.exponential("1 second").pipe(Schedule.both(Schedule.recurs(5)));
