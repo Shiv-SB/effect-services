@@ -30,6 +30,7 @@
     "@azure/cosmos": "^4.9.2",
     "@azure/identity": "^4.13.1",
     "@azure/keyvault-secrets": "^4.10.0",
+    "@azure/storage-file-share": "^12.30.0",
     "@companieshouse/api-sdk-node": "^2.0.336",
     "@microsoft/microsoft-graph-client": "^3.0.7",
     "mssql": "^12.3.0"
@@ -38,6 +39,10 @@
     "build"
   ],
   "exports": {
+    "./azurefs": {
+      "types": "./build/azurefs/index.d.ts",
+      "import": "./build/azurefs/index.js"
+    },
     "./imanage": {
       "types": "./build/imanage/index.d.ts",
       "import": "./build/imanage/index.js"
