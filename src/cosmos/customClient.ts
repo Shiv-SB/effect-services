@@ -1,5 +1,5 @@
 import { Context, Duration, Effect, Layer, Schedule, Stream, flow } from 'effect';
-import { type CosmosSDKConfigOpts } from "./CosmosSDK";
+import { type CosmosSDKConfigOpts } from "./cosmosSDK";
 import { CosmosClient as _client, ErrorResponse, type ItemDefinition, type SqlQuerySpec } from "@azure/cosmos";
 import { CosmosError } from "./common";
 import { unravel } from '../internals/helpers';

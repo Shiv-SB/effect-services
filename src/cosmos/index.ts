@@ -1,4 +1,4 @@
-export * from "./CosmosSDK";
+export * from "./cosmosSDK";
 
 export * from "./common";
 
