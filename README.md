@@ -536,10 +536,13 @@ const SecretsProvider = MakeKeyVaultProvider({
     credential: new DefaultAzureCredential()
 });
 
-// Construct a config provider layer with a fallback to process.env
-const providerLayer = ConfigProvider.layer(SecretsProvider).pipe(
-    Layer.merge(ConfigProvider.layerAdd(ConfigProvider.fromEnv()))
+// Provide a fallback to process.env
+const MergedProvider = SercretsProvider.pipe(
+    ConfigProvider.orElse(ConfigProvider.fromEnv)
 );
+
+// Convert the provider into a layer.
+const providerLayer = ConfigProvider.layer(MergedProvider);
 
 // A simple provider function which constructs and then provides our layers.
 // We use an Effectful function for this because we need to yield* Config values.

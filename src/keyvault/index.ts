@@ -86,16 +86,17 @@ interface MakeConfigHandlerOpts extends KeyVaultOpts {
      * errors or missing secrets. To return a `SourceError` in these cases, set this to `throw`.
      * 
      * Setting this to `passthrough` will not return a `SourceError` but instead
-     * an `undefined`. This allows downstream handling where permitted, i.e with
-     * a fallback ConfigProvider
+     * an `undefined` and log the underlying error.
+     * This allows downstream handling with a fallback ConfigProvider
      * 
      * @default "passthrough"
      */
-    onKeyVaultError?: "passthrough" | "throw"
+    onKeyVaultError?: "passthrough" | "throw";
+    /**
+     * @default false
+     */
+    suppressWarnings?: boolean;
 }
-
-const sourceErrorText = "Underlying Key Vault Service errored. " + 
-    "To allow this ConfigProvider to fallback, set 'onKeyVaultError' to 'passthrough'.";
 
 const MakeConfigHandler = (
     keyVaultOpts: MakeConfigHandlerOpts
@@ -103,7 +104,8 @@ const MakeConfigHandler = (
     const kv = yield* KeyVault;
 
     const { 
-        onKeyVaultError = "passthrough"
+        onKeyVaultError = "passthrough",
+        suppressWarnings = false,
     } = keyVaultOpts;
 
     const key = path.join("");
@@ -111,12 +113,21 @@ const MakeConfigHandler = (
     const getSecret = yield* kv.use((c) => c.getSecret(key)).pipe(Effect.result);
 
     if (Result.isFailure(getSecret)) {
+        const err = getSecret.failure;
         if (onKeyVaultError === "throw") {
             return yield* new SourceError({
-                message: sourceErrorText,
-                cause: getSecret.failure,
+                message: "Underlying Key Vault Service errored. " + 
+                    "To allow this ConfigProvider to fallback, set 'onKeyVaultError' to 'passthrough'.",
+                cause: err.cause,
             });
         } else {
+            if (!suppressWarnings) {
+                yield* Effect.logWarning(
+                    "Unable to retrieve item from Key Vault", 
+                    { "item name": key, "response from keyvault": err.cause },
+                    "\n(To supress this warning, set 'supressWarnings' to true)"
+                );
+            }
             return undefined;
         }
     }
@@ -128,7 +139,13 @@ const MakeConfigHandler = (
     return ConfigProvider.makeValue(secret);
 }, flow(
     Effect.provide(KeyVault.layer(keyVaultOpts)),
-    Effect.catchIf(() => keyVaultOpts.onKeyVaultError === "passthrough", () => Effect.undefined)
+    Effect.catchIf(
+        () => keyVaultOpts.onKeyVaultError !== "throw",
+        (e) => Effect.gen(function* () {
+            yield* Effect.logError("MakeConfigHandler caught error:", e);
+            return yield* Effect.undefined;
+        })
+    ),
 ));
 
 /**
