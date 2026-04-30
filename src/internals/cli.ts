@@ -118,8 +118,3 @@ const Test = Effect.gen(function* () {
 
     yield* Effect.log(result);
 });
-
-pipe(
-    Test,
-    Effect.runPromise,
-)
