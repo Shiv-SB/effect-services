@@ -1,5 +1,5 @@
 import { SecretClient } from "@azure/keyvault-secrets";
-import { Cache, ConfigProvider, Context, Data, Effect, flow, Layer } from "effect";
+import { Cache, ConfigProvider, Context, Data, Effect, flow, Layer, Result } from "effect";
 import { type TokenCredential } from "@azure/identity";
 import { SourceError } from "effect/ConfigProvider";
 
@@ -68,7 +68,7 @@ export class KeyVault extends Context.Service<KeyVault>()("effect-services/keyva
 export type CacheOptions = Omit<Parameters<typeof Cache["make"]>[0], "lookup">;
 
 export class KeyVaultAsCache extends Context.Service<KeyVaultAsCache>()("effect-services/keyvault/index/KeyVaultAsCache", {
-    make: Effect.fn(function* (options: CacheOptions) {
+    make: Effect.fn("keyvaultcache.make")(function* (options: CacheOptions) {
         const kv = yield* KeyVault;
         const cache = yield* Cache.make({
             ...options,
@@ -80,21 +80,55 @@ export class KeyVaultAsCache extends Context.Service<KeyVaultAsCache>()("effect-
     static readonly layer = (cacheOptions: CacheOptions) => Layer.effect(this, this.make(cacheOptions))
 }
 
-const MakeConfigHandler = (keyVaultOpts: KeyVaultOpts) => Effect.fn(function* (path: ConfigProvider.Path) {
+interface MakeConfigHandlerOpts extends KeyVaultOpts {
+    /**
+     * The underlying KeyVault implementation may throw on error network
+     * errors or missing secrets. To return a `SourceError` in these cases, set this to `throw`.
+     * 
+     * Setting this to `passthrough` will not return a `SourceError` but instead
+     * an `undefined`. This allows downstream handling where permitted, i.e with
+     * a fallback ConfigProvider
+     * 
+     * @default "passthrough"
+     */
+    onKeyVaultError?: "passthrough" | "throw"
+}
+
+const sourceErrorText = "Underlying Key Vault Service errored. " + 
+    "To allow this ConfigProvider to fallback, set 'onKeyVaultError' to 'passthrough'.";
+
+const MakeConfigHandler = (
+    keyVaultOpts: MakeConfigHandlerOpts
+) => Effect.fn("keyvault.configprovider")(function* (path: ConfigProvider.Path) {
     const kv = yield* KeyVault;
+
+    const { 
+        onKeyVaultError = "passthrough"
+    } = keyVaultOpts;
+
     const key = path.join("");
-    yield* Effect.log("Fetching key:", key);
-    const secret = yield* kv.use((c) => c.getSecret(key)).pipe(Effect.map((s) => s.value));
+
+    const getSecret = yield* kv.use((c) => c.getSecret(key)).pipe(Effect.result);
+
+    if (Result.isFailure(getSecret)) {
+        if (onKeyVaultError === "throw") {
+            return yield* new SourceError({
+                message: sourceErrorText,
+                cause: getSecret.failure,
+            });
+        } else {
+            return undefined;
+        }
+    }
+
+    const secret = getSecret.success.value;
 
     if (!secret) return undefined;
 
     return ConfigProvider.makeValue(secret);
 }, flow(
-    Effect.mapError((e) => new SourceError({
-        message: "Underlying Key Vault Service errored.",
-        cause: e,
-    })),
     Effect.provide(KeyVault.layer(keyVaultOpts)),
+    Effect.catchIf(() => keyVaultOpts.onKeyVaultError === "passthrough", () => Effect.undefined)
 ));
 
 /**
@@ -112,7 +146,7 @@ const MakeConfigHandler = (keyVaultOpts: KeyVaultOpts) => Effect.fn(function* (p
  * 
  * @example
  * const provider = MakeKeyVaultProvider({
- *      vaultURL: "https://example.vault.azure.net/"
+ *      vaultURL: "https://example.vault.azure.net/",
  *      credential: new DefaultAzureCredential()
  * });
  * 
@@ -127,5 +161,5 @@ const MakeConfigHandler = (keyVaultOpts: KeyVaultOpts) => Effect.fn(function* (p
  * );
  */
 export const MakeKeyVaultProvider = (
-    opts: KeyVaultOpts
+    opts: MakeConfigHandlerOpts
 ) => ConfigProvider.make((p) => MakeConfigHandler(opts)(p));

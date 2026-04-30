@@ -35,7 +35,7 @@ export class CosmosClient extends Context.Service<CosmosClient>()("effect-servic
         const container = Effect.fn(function* (containerName: string) {
             const containerClient = db.container(containerName);
 
-            const upsert = Effect.fn("cosmos_client_upsert")(function* <T extends ItemDefinition>(record: T) {
+            const upsert = Effect.fn("cosmosclient.upsert")(function* <T extends ItemDefinition>(record: T) {
                 const req = Effect.tryPromise({
                     try: () => containerClient.items.upsert<T>(record, { disableAutomaticIdGeneration: true }),
                     catch: (e) => new CosmosError({
@@ -62,7 +62,7 @@ export class CosmosClient extends Context.Service<CosmosClient>()("effect-servic
                 return stream;
             });
 
-            const query = Effect.fn("cosmos_client_query")(function* (query: SqlQuerySpec) {
+            const query = Effect.fn("cosmosclient.query")(function* (query: SqlQuerySpec) {
                 const get = Effect.tryPromise({
                     try: () => containerClient.items.query(query).fetchAll(),
                     catch: (e) => new CosmosError({
@@ -76,7 +76,7 @@ export class CosmosClient extends Context.Service<CosmosClient>()("effect-servic
                 return yield* get;
             });
 
-            const queryToStream = Effect.fn("cosmos_client_queryToStream")(function* (query: SqlQuerySpec) {
+            const queryToStream = Effect.fn("cosmosclient.querytostream")(function* (query: SqlQuerySpec) {
                 const feed = containerClient.items.query(query).getAsyncIterator();
                 const stream = Stream.fromAsyncIterable(feed, (e) => new CosmosError({
                     cause: e,
