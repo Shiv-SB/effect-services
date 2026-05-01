@@ -9,14 +9,14 @@ import {
 } from "@azure/storage-file-share";
 import { Context, Data, Effect, Layer, Option, Queue, Stream } from "effect";
 
-interface AzureFsSdkConfigOpts {
+export interface AzureFsSdkConfigOpts {
     url: string;
     credential: TokenCredential | StorageSharedKeyCredential;
 }
 
-class AzureFsSdkConfig extends Context.Service<AzureFsSdkConfig, AzureFsSdkConfigOpts>()("AzureFsSdkConfig") { }
+export class AzureFsSdkConfig extends Context.Service<AzureFsSdkConfig, AzureFsSdkConfigOpts>()("AzureFsSdkConfig") { }
 
-const AzureFsSdkConfigLayer = (opts: AzureFsSdkConfigOpts) => Layer.succeed(AzureFsSdkConfig, opts);
+export const AzureFsSdkConfigLayer = (opts: AzureFsSdkConfigOpts) => Layer.succeed(AzureFsSdkConfig, opts);
 
 export class AzureFsSdkError extends Data.TaggedError("AzureFsSdkError")<{
     message: string;

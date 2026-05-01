@@ -1,7 +1,6 @@
 import * as S from "effect/Schema";
 import * as Data from "effect/Data";
 import * as Effect from "effect/Effect";
-import { pipe } from "effect";
 
 export class ValidatorError extends Data.TaggedError("ValidatorError")<{
     message: string;
@@ -107,14 +106,4 @@ export const Validator = <A extends string, L extends string>(
     }
 
     return { args: result.success, longFlags: collectedLongFlags };
-});
-
-const Test = Effect.gen(function* () {
-    const result = yield* Validator({
-        shortFlag: "-c",
-        allowedArgs: ["users", "sessions"],
-        longFlags: ["now"],
-    });
-
-    yield* Effect.log(result);
 });

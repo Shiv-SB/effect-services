@@ -1,6 +1,6 @@
 {
   "name": "effect-services",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "module": "index.ts",
   "types": "index.d.ts",
   "type": "module",
@@ -16,12 +16,11 @@
     "url": "https://github.com/Shiv-SB/effect-services"
   },
   "devDependencies": {
-    "@effect/experimental": "^0.60.0",
     "@effect/language-service": "^0.85.1",
     "@types/bun": "1.3.13",
     "@types/mssql": "^12.3.0",
-    "ts-humanize": "^1.0.2",
-    "effect": "^4.0.0-beta.59"
+    "effect": "^4.0.0-beta.59",
+    "ts-humanize": "^1.0.2"
   },
   "peerDependencies": {
     "typescript": "^6.0.3",

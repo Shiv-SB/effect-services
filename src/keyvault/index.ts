@@ -19,7 +19,7 @@ export interface KeyVaultOpts {
     credential: TokenCredential;
 };
 
-class KeyVaultConfig extends Context.Service<
+export class KeyVaultConfig extends Context.Service<
     KeyVaultConfig,
     KeyVaultOpts
 >()("effect-services/keyvault/KeyVaultConfig") { };
