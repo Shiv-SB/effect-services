@@ -17,6 +17,7 @@
   },
   "devDependencies": {
     "@effect/language-service": "^0.85.1",
+    "@effect/vitest": "^4.0.0-beta.60",
     "@types/bun": "1.3.13",
     "@types/mssql": "^12.3.0",
     "effect": "^4.0.0-beta.59",
