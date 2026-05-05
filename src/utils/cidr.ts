@@ -1,4 +1,4 @@
-import { Data, Effect, Schema as S } from "effect";
+import { Data, Effect, pipe, Schema as S } from "effect";
 
 export class NetMaskError extends Data.TaggedError("NetMaskError")<{
     message: string;
@@ -52,7 +52,7 @@ const IpSchema = S.TemplateLiteralParser([
     OctectSchema,
 ]).annotate({
     identifier: "IP Address",
-});
+})
 
 const CidrSchema = S.TemplateLiteralParser([
     OctectSchema,
@@ -64,7 +64,9 @@ const CidrSchema = S.TemplateLiteralParser([
     OctectSchema,
     "/",
     MaskSchema,
-]);
+]).annotate({
+    identifier: "CIDR"
+});
 
 const contains_internal = Effect.fn(function* (srcIpNum: number, srcMaskNum: number, targetAddr: string) {
     const parts = yield* S.decodeUnknownEffect(IpSchema)(targetAddr).pipe(
@@ -127,16 +129,105 @@ export const make: (
     });
 });
 
+const IpOrCidrSchema = S.Union([IpSchema, CidrSchema]);
+
+type AddressOrCIDR = typeof IpOrCidrSchema.Encoded;
+
+class NetMask2 extends Data.Class<{ address: AddressOrCIDR }> {
+    private numToIp = (n: number) => `${(n >> 24) & 255}.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
+
+    private parts = Effect.fnUntraced(function* (addr: string) {
+        const parts = yield* S.decodeUnknownEffect(IpOrCidrSchema)(addr).pipe(
+            Effect.mapError((e) => new NetMaskError({
+                cause: e.issue,
+                message: e.message
+            }))
+        );
+        return {
+            a: parts[0],
+            b: parts[2],
+            c: parts[4],
+            d: parts[6],
+            prefix: parts[8] ?? 0
+        };
+    });
+
+    private ipNum = this.parts(this.address).pipe(
+        Effect.map(({ a, b, c, d }) => (a << 24) | (b << 16) | (c << 8) | d)
+    );
+
+    private maskNum = this.parts(this.address).pipe(
+        Effect.map(({ prefix }) => (0xFFFFFFFF << (32 - prefix)) & 0xFFFFFFFF)
+    );
+
+    private networkNum = Effect.all([this.ipNum, this.maskNum]).pipe(
+        Effect.map(([a, b]) => a & b)
+    );
+
+    private broadcastNum = Effect.all([this.networkNum, this.maskNum]).pipe(
+        Effect.map(([n, m]) => n | (~m & 0xFFFFFFFF))
+    );
+
+    private hostmaskNum = this.maskNum.pipe(
+        Effect.map((n) => ~n & 0xFFFFFFFF)
+    );
+
+    private contains_internal = (
+        targetAddr: string,
+        srcIpNum: number,
+        srcMaskNum: number,
+    ) => pipe(
+        S.decodeUnknownEffect(IpSchema)(targetAddr),
+        Effect.mapError((e) => new NetMaskError({
+            cause: e.issue,
+            message: e.message,
+        })),
+        Effect.map((parts) => [parts[0], parts[2], parts[4], parts[6]] as const),
+        Effect.map(([a, b, c, d]) => (a << 24) | (b << 16) | (c << 8) | d),
+        Effect.map((targetIpNum) => (srcIpNum & srcMaskNum) >>> 0 === (targetIpNum & srcMaskNum) >>> 0)
+    );
+
+    public base = this.networkNum.pipe(Effect.map(this.numToIp));
+    public mask = this.maskNum.pipe(Effect.map(this.numToIp));
+    public bitmask = this.parts(this.address).pipe(Effect.map((p) => p.prefix.toString(10)));
+    public hostmask = this.hostmaskNum.pipe(Effect.map(this.numToIp));
+    public broadcast = this.broadcastNum.pipe(Effect.map(this.numToIp));
+    public size = this.parts(this.address).pipe(
+        Effect.map(({ prefix }) => (1 << 32 - prefix).toString())
+    );
+    public first = this.networkNum.pipe(Effect.map((n) => this.numToIp(n + 1)));
+    public last = this.broadcastNum.pipe(Effect.map((n) => this.numToIp(n - 1)));
+    public contains = (address: typeof IpSchema.Encoded) => Effect.all([this.ipNum, this.maskNum]).pipe(
+        Effect.andThen(([ip, mask]) => this.contains_internal(address, ip, mask))
+    );
+}
+
 //----------
 
-const testRange = "192.168.8.3/30";
 
 Effect.gen(function* () {
-    const netmask = yield* make(testRange);
-    yield* Effect.log(netmask);
+    const testRange = "192.168.8.3/30";
 
-    const res = yield* netmask.contains("192.168.8.4");
-    yield* Effect.log(res);
+    //netmask v1
+    {
+        const netmask = yield* make(testRange);
+        const targetTest = "192.168.5.9";
+        const doesContain = yield* netmask.contains(targetTest);
+        yield* Effect.log("result:", doesContain);
+        const mask = netmask.hostmask;
+        yield* Effect.log(mask);
+    }
+
+
+    // netmask v2
+    {
+        const netmask = new NetMask2({ address: testRange });
+        const targetTest = "192.168.5.9";
+        const doesContain = yield* netmask.contains(targetTest);
+        yield* Effect.log("result:", doesContain);
+        const mask = yield* netmask.hostmask;
+        yield* Effect.log(mask);
+    }
 }).pipe(
     Effect.runPromise,
 );
