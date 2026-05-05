@@ -1,11 +1,14 @@
 import { Data, Effect } from "effect";
+import type { IpOrCidrSchema } from "./schemas";
 
 export class NetMaskError extends Data.TaggedError("NetMaskError")<{
     message: string;
     cause?: unknown;
 }> { }
 
-export interface NetMaskImpl <T extends "safe" | "unsafe">{
+type ImplTag = "sync" | "effect";
+
+export interface NetMaskImpl <T extends ImplTag>{
     base: string;
     mask: string;
     bitmask: number;
@@ -14,5 +17,9 @@ export interface NetMaskImpl <T extends "safe" | "unsafe">{
     size: number;
     first: string;
     last: string;
-    contains: (address: string) => T extends "safe" ? Effect.Effect<boolean, NetMaskError> : boolean;
+    contains: (address: string) => T extends "effect" ? Effect.Effect<boolean, NetMaskError> : boolean;
+}
+
+export interface NetMaskArgs {
+    address: typeof IpOrCidrSchema.Encoded;
 }

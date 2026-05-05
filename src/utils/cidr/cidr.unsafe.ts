@@ -1,8 +1,8 @@
 import { Data, Schema as S } from "effect";
-import { type NetMaskImpl } from "./common";
+import { type NetMaskArgs, type NetMaskImpl } from "./common";
 import { IpOrCidrSchema, IpSchema } from "./schemas";
 
-class _NetMaskUnsafe extends Data.Class<{ address: typeof IpOrCidrSchema.Encoded }> {
+class _NetMaskUnsafe extends Data.Class<NetMaskArgs> {
     private numToIp = (n: number) => `${(n >> 24) & 255}.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 
     private get parts() {
@@ -62,6 +62,4 @@ class _NetMaskUnsafe extends Data.Class<{ address: typeof IpOrCidrSchema.Encoded
     }
 }
 
-
-
-export class NetMaskUnsafe extends _NetMaskUnsafe implements NetMaskImpl<"unsafe"> { }
+export class MakeSync extends _NetMaskUnsafe implements NetMaskImpl<"sync"> { }

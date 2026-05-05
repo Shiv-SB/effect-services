@@ -1,6 +1,6 @@
-export * as Safe from "./cidr";
+export * from "./cidr";
 
-export * as Unsafe from "./cidr.unsafe";
+export * from "./cidr.unsafe";
 
 export { NetMaskError } from "./common";
 
