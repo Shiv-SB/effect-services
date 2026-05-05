@@ -1,8 +1,9 @@
-import { Data, Schema as S } from "effect";
-import { type NetMaskArgs, type NetMaskImpl } from "./common";
+import { Schema as S } from "effect";
+import { NetMask, NetMaskImpl } from "./common";
 import { IpOrCidrSchema, IpSchema } from "./schemas";
 
-class _NetMaskUnsafe extends Data.Class<NetMaskArgs> {
+// TODO: fix type errors
+class MakeUnsafe extends NetMask<"sync"> implements NetMaskImpl<"sync"> {
     private numToIp = (n: number) => `${(n >> 24) & 255}.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 
     private get parts() {
@@ -54,12 +55,10 @@ class _NetMaskUnsafe extends Data.Class<NetMaskArgs> {
 
     public readonly last = this.numToIp(this.broadcastNum - 1);
 
-    public contains(targetAddr: string): boolean {
+    public readonly contains = (targetAddr: string): boolean => {
         const parts = S.decodeUnknownSync(IpSchema)(targetAddr);
         const [a, b, c, d] = [parts[0], parts[2], parts[4], parts[6]];
         const targetIpNum = (a << 24) | (b << 16) | (c << 8) | d;
         return this.networkNum >>> 0 === (targetIpNum & this.maskNum) >>> 0
     }
 }
-
-export class MakeSync extends _NetMaskUnsafe implements NetMaskImpl<"sync"> { }
