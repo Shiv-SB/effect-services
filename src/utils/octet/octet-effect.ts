@@ -19,6 +19,23 @@ const contains_internal = (
     Effect.map((targetIpNum) => (srcIpNum & srcMaskNum) >>> 0 === (targetIpNum & srcMaskNum) >>> 0)
 );
 
+/**
+ * Creates an Effectful utility class for parsing IP addresses.
+ * If the bitmask is ommited, it will default to 0.
+ * 
+ * @example
+ * 
+ * import * as Utils from "effect-services/utils";
+ * 
+ * const Example = Effect.gen(function* () {
+ *  const octet = yield* Utils.Octet.MakeEffect({ address: "192.168.0.1/32" });
+ *  const size = octect.size;
+ *  yield* Effect.log(size);
+ * 
+ *  const result = yield* octet.contains("192.168.0.100");
+ *  yield* Effect.log(result);
+ * });
+ */
 export const MakeEffect: (
     args: OctetArgs
 ) => Effect.Effect<OctetEffect, OctetError, never> = Effect.fn(function* (args) {

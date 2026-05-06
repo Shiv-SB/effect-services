@@ -64,6 +64,13 @@ class OctetSync extends _OctetSync implements OctetImpl<"sync"> {
     }
 }
 
+/**
+ * Creates a utility class for parsing IP addresses.
+ * If the bitmask is ommited, it will default to 0.
+ * 
+ * The utility class will throw a `SchemaError` if the
+ * recieved IP address is invalid.
+ */
 export const MakeSync = Effect.fnUntraced(function* (args: OctetArgs) {
     return new OctetSync(args);
 });
