@@ -1,8 +1,8 @@
 import { Data, Effect, pipe, Schema as S } from "effect";
-import { NetMaskError, type NetMaskImpl, type NetMaskArgs } from "./common";
+import { OctetError, type OctetImpl, type OctetArgs } from "./common";
 import { IpSchema, IpOrCidrSchema } from "./schemas";
 
-class NetMaskEffect extends Data.Class<NetMaskImpl<"effect"> & NetMaskArgs> { };
+class OctetEffect extends Data.Class<OctetImpl<"effect"> & OctetArgs> { };
 
 const contains_internal = (
     targetAddr: string,
@@ -10,7 +10,7 @@ const contains_internal = (
     srcMaskNum: number,
 ) => pipe(
     S.decodeUnknownEffect(IpSchema)(targetAddr),
-    Effect.mapError((e) => new NetMaskError({
+    Effect.mapError((e) => new OctetError({
         cause: e.issue,
         message: e.message,
     })),
@@ -20,10 +20,10 @@ const contains_internal = (
 );
 
 export const MakeEffect: (
-    args: NetMaskArgs
-) => Effect.Effect<NetMaskEffect, NetMaskError, never> = Effect.fn(function* (args) {
+    args: OctetArgs
+) => Effect.Effect<OctetEffect, OctetError, never> = Effect.fn(function* (args) {
     const parts = yield* S.decodeUnknownEffect(IpOrCidrSchema)(args.address).pipe(
-        Effect.mapError((e) => new NetMaskError({
+        Effect.mapError((e) => new OctetError({
             cause: e.issue,
             message: e.message
         }))
@@ -50,7 +50,7 @@ export const MakeEffect: (
         return yield* contains_internal(address, ipNum, maskNum);
     });
 
-    return new NetMaskEffect({
+    return new OctetEffect({
         address: args.address,
         base,
         mask,

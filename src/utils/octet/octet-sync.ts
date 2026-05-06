@@ -1,10 +1,10 @@
 import { Data, Effect, Schema as S } from "effect";
-import type { NetMaskArgs, NetMaskImpl } from "./common";
+import type { OctetArgs, OctetImpl } from "./common";
 import { IpOrCidrSchema, IpSchema } from "./schemas";
 
-class _NetMaskSync extends Data.Class<NetMaskArgs> { };
+class _OctetSync extends Data.Class<OctetArgs> { };
 
-class NetMaskSync extends _NetMaskSync implements NetMaskImpl<"sync"> {
+class OctetSync extends _OctetSync implements OctetImpl<"sync"> {
     #numToIp = (n: number) => `${(n >> 24) & 255}.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 
     get #parts() {
@@ -64,6 +64,6 @@ class NetMaskSync extends _NetMaskSync implements NetMaskImpl<"sync"> {
     }
 }
 
-export const MakeSync = Effect.fnUntraced(function* (args: NetMaskArgs) {
-    return new NetMaskSync(args);
+export const MakeSync = Effect.fnUntraced(function* (args: OctetArgs) {
+    return new OctetSync(args);
 });

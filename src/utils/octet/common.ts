@@ -1,18 +1,18 @@
 import { Data, Effect } from "effect";
 import type { IpOrCidrSchema } from "./schemas";
 
-export class NetMaskError extends Data.TaggedError("NetMaskError")<{
+export class OctetError extends Data.TaggedError("OctetError")<{
     message: string;
     cause?: unknown;
 }> { }
 
-export interface NetMaskArgs {
+export interface OctetArgs {
     address: typeof IpOrCidrSchema.Encoded;
 }
 
-type NetMaskTag = "sync" | "effect";
+type OctetTag = "sync" | "effect";
 
-export interface NetMaskImpl<T extends NetMaskTag> {
+export interface OctetImpl<T extends OctetTag> {
     base: string;
     mask: string;
     bitmask: number;
@@ -21,5 +21,5 @@ export interface NetMaskImpl<T extends NetMaskTag> {
     size: number;
     first: string;
     last: string;
-    contains: (address: string) => T extends "sync" ? boolean : Effect.Effect<boolean, NetMaskError>;
+    contains: (address: string) => T extends "sync" ? boolean : Effect.Effect<boolean, OctetError>;
 }
