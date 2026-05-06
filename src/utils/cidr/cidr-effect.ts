@@ -1,6 +1,8 @@
-import { Effect, pipe, Schema as S } from "effect";
-import { NetMask, NetMaskError, type NetMaskArgs } from "./common";
+import { Data, Effect, pipe, Schema as S } from "effect";
+import { NetMaskError, type NetMaskImpl, type NetMaskArgs } from "./common";
 import { IpSchema, IpOrCidrSchema } from "./schemas";
+
+class NetMaskEffect extends Data.Class<NetMaskImpl<"effect"> & NetMaskArgs> { };
 
 const contains_internal = (
     targetAddr: string,
@@ -19,7 +21,7 @@ const contains_internal = (
 
 export const MakeEffect: (
     args: NetMaskArgs
-) => Effect.Effect<NetMask<"effect">, NetMaskError, never> = Effect.fn(function* (args) {
+) => Effect.Effect<NetMaskEffect, NetMaskError, never> = Effect.fn(function* (args) {
     const parts = yield* S.decodeUnknownEffect(IpOrCidrSchema)(args.address).pipe(
         Effect.mapError((e) => new NetMaskError({
             cause: e.issue,
@@ -48,7 +50,7 @@ export const MakeEffect: (
         return yield* contains_internal(address, ipNum, maskNum);
     });
 
-    return new NetMask({
+    return new NetMaskEffect({
         address: args.address,
         base,
         mask,

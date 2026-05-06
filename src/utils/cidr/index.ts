@@ -1,6 +1,6 @@
-export * from "./cidr";
+export * from "./cidr-effect";
 
-export * from "./cidr.unsafe";
+export * from "./cidr-sync";
 
 export { NetMaskError } from "./common";
 
