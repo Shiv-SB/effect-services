@@ -1,6 +1,6 @@
-export * from "./octet-effect";
+export { MakeEffect } from "./octet-effect";
 
-export * from "./octet-sync";
+export { MakeSync } from "./octet-sync";
 
 export { OctetError } from "./common";
 

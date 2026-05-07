@@ -1,5 +1,5 @@
 import { Data, Effect, pipe, Schema as S } from "effect";
-import { IpOrCidrSchema } from "./schemas";
+import { IpOrCidrSchema, type Address } from "./schemas";
 
 //#region Types & Classes
 
@@ -7,8 +7,6 @@ export class OctetError extends Data.TaggedError("OctetError")<{
     message: string;
     cause?: unknown;
 }> { }
-
-export type Address = typeof IpOrCidrSchema.Encoded;
 
 export interface OctetArgs {
     address: Address;
@@ -28,6 +26,9 @@ export interface OctetImpl<T extends OctetTag> {
     last: string;
     contains: (address: string) => T extends "sync" ? boolean : Effect.Effect<boolean, OctetError>;
     private: boolean; // https://www.rfcreader.com/#rfc1918_line141
+    // TODO: impl below
+    //isLoopback: boolean;
+    //isLinkLocal: boolean;
 }
 
 type Parts = {
@@ -40,44 +41,50 @@ type Parts = {
 
 //#region Functions
 
+/**
+ * Ignores mask if CIDR is provided.
+ */
 export const isPrivate = (addr: Address): boolean => {
-    const parts = addr.split(".")
-    const [a, b] = [parts[0], parts[2]].map(Number);
+    const parts = addr.split(".");
+
+    const a = Number(parts[0]);
+    const b = Number(parts[1]);
 
     return (
         a === 10 ||                             // 10.*
-        (a === 172 && b! >= 16 && b! <= 31) ||  // 172.{16 - 31}.*
+        (a === 172 && b >= 16 && b <= 31) ||    // 172.16.*
         (a === 192 && b === 168)                // 192.168.*
     );
 };
 
 export const numToIp = (n: number) => `${(n >> 24) & 255}.${(n >> 16) & 255}.${(n >> 8) & 255}.${n & 255}`;
 
-export const getPartsSync = (addr: Address): Parts => {
-    const parts = S.decodeSync(IpOrCidrSchema)(addr);
+export const addrStrToParts = (addr: Address): Parts => {
+    const parts = addr.split(".").map(Number);
     return {
-        a: parts[0],
-        b: parts[2],
-        c: parts[4],
-        d: parts[6],
+        a: parts[0]!,
+        b: parts[2]!,
+        c: parts[4]!,
+        d: parts[6]!,
         prefix: parts[8] ?? 32
     };
 }
 
-export const getParts = Effect.fn(function* (addr: Address) {
-    const parts = yield* S.decodeUnknownEffect(IpOrCidrSchema)(addr).pipe(
+export const getPartsSync = (addr: Address): Parts => {
+    const validated = S.decodeSync(IpOrCidrSchema)(addr);
+    return addrStrToParts(validated);
+}
+
+export const getParts: (
+    addr: Address
+) => Effect.Effect<Parts, OctetError> = Effect.fn(function* (addr: Address) {
+    const validated = yield* S.decodeUnknownEffect(IpOrCidrSchema)(addr).pipe(
         Effect.mapError((e) => new OctetError({
             cause: e.issue,
             message: e.message
         }))
     );
-    return {
-        a: parts[0],
-        b: parts[2],
-        c: parts[4],
-        d: parts[6],
-        prefix: parts[8] ?? 32
-    };
+    return addrStrToParts(validated);
 });
 
 const partsToIpNum = (parts: Parts): number => {

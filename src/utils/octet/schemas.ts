@@ -1,51 +1,38 @@
 import { Schema as S } from "effect";
 
-const OctectSchema = S.Int.pipe(S.check(
-    S.isBetween({
-        minimum: 0,
-        maximum: 255,
-        exclusiveMinimum: false,
-        exclusiveMaximum: false,
-    }))
-).annotate({
-    identifier: "Octect",
-})
+/**
+ * Strict IPv4 octet:
+ *
+ * 0
+ * 1-9
+ * 10-99
+ * 100-199
+ * 200-249
+ * 250-255
+ *
+ * No leading zeros allowed.
+ */
+const IPV4_OCTET = "(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]\\d?|0)";
 
-const MaskSchema = S.Int.pipe(S.check(
-    S.isBetween({
-        minimum: 0,
-        maximum: 32,
-        exclusiveMinimum: false,
-        exclusiveMaximum: false,
-    }))
-).annotate({
-    identifier: "Routing Prefix",
-});
+const IPV4_REGEX = new RegExp(`^(${IPV4_OCTET}\\.){3}${IPV4_OCTET}$`);
 
-export const IpSchema = S.TemplateLiteralParser([
-    OctectSchema,
-    ".",
-    OctectSchema,
-    ".",
-    OctectSchema,
-    ".",
-    OctectSchema,
-]).annotate({
-    identifier: "IP Address",
-})
+const CIDR_MASK = "(?:3[0-2]|[12]?\\d)";
 
-export const CidrSchema = S.TemplateLiteralParser([
-    OctectSchema,
-    ".",
-    OctectSchema,
-    ".",
-    OctectSchema,
-    ".",
-    OctectSchema,
-    "/",
-    MaskSchema,
-]).annotate({
-    identifier: "CIDR"
-});
+const CIDR_REGEX = new RegExp(`^(${IPV4_OCTET}\\.){3}${IPV4_OCTET}\\/${CIDR_MASK}$`);
 
-export const IpOrCidrSchema = S.Union([IpSchema, CidrSchema]);
+export const IpSchema = S.String.pipe(
+    S.refine((s): s is IpAddress => IPV4_REGEX.test(s))
+)
+
+export const CidrSchema = S.String.pipe(
+    S.refine((s): s is Cidr => CIDR_REGEX.test(s))
+)
+
+export const IpOrCidrSchema = S.Union([
+    IpSchema,
+    CidrSchema,
+]);
+
+export type IpAddress = `${number}.${number}.${number}.${number}`;
+export type Cidr = `${IpAddress}/${number}`;
+export type Address = typeof IpOrCidrSchema.Type;

@@ -18,7 +18,7 @@ import {
 
 class _OctetSync extends Data.Class<OctetArgs> { };
 
-class OctetSync extends _OctetSync implements OctetImpl<"sync"> {
+export class OctetSync extends _OctetSync implements OctetImpl<"sync"> {
     #parts = getPartsSync(this.address);
     #networkNum = partsToNetworkNum(this.#parts);
     #maskNum = prefixToMaskNum(this.#parts.prefix);
