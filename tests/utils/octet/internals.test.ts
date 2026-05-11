@@ -222,7 +222,7 @@ B.describe("Octet Internals", () => {
         });
     });
 
-    B.describe.only(common.getFirst, () => {
+    B.describe(common.getFirst, () => {
         const testCases: [number, number, number][] = [
             // /31 and /32 should return the base unchanged
             [31, 0, 0],
@@ -251,8 +251,41 @@ B.describe("Octet Internals", () => {
             B.expect(result).toBe(expected);
         });
     });
-});
 
+    B.describe.only(common.getLast, () => {
+        const testCases: [number, number, number][] = [
+            // /31 and /32 should return the broadcast unchanged
+            [31, 0, 0],
+            [31, 10, 10],
+            [31, 3232235775, 3232235775], // 192.168.0.255
+
+            [32, 0, 0],
+            [32, 12345, 12345],
+            [32, 4294967295, 4294967295], // 255.255.255.255
+
+            // Anything below /31 should decrement by 1
+            [30, 3, 2],
+            [30, 11, 10],
+            [24, 3232235775, 3232235774], // 192.168.0.254
+            [16, 167837695, 167837694],   // 10.0.255.254
+            [8, 2894069759, 2894069758],  // 172.255.255.254
+
+            // Edge-ish valid boundaries
+            [1, 4294967295, 4294967294],
+            [29, 4294967295, 4294967294],
+            [0, 4294967295, 4294967294],
+        ];
+
+        B.test.each(testCases)(
+            "prefix %p and broadcast %p should result in %p",
+            (p, b, expected) => {
+                const result = common.getLast(p, b);
+
+                B.expect(result).toBe(expected);
+            },
+        );
+    });
+});
 
 T.describe("Octet Sync", () => {
     T.effect("should construct with valid IP address", () => Effect.gen(function* () {
