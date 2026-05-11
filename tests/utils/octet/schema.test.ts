@@ -1,6 +1,6 @@
 import * as B from "bun:test";
 import { Schema } from 'effect';
-import { CidrSchema, IpAddress, IpSchema } from '../../../src/utils/octet/schemas';
+import { CidrSchema, type IpAddress, IpSchema } from '../../../src/utils/octet/schemas';
 
 B.describe("IpSchema", () => {
     const passCases = [

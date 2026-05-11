@@ -4,24 +4,24 @@ import {
     getFirst,
     getLast,
     getPartsSync,
-    getSize,
+    getAddressCount,
     hostmaskNum,
     isPrivate,
     numToIp,
     partsToBroadcastNumber,
-    partsToNetworkNum,
-    prefixToMaskNum,
-    type Address,
+    cidrToUInt,
+    prefixToUInt,
     type OctetArgs,
     type OctetImpl
 } from "./common";
+import type { Address } from "./schemas";
 
 class _OctetSync extends Data.Class<OctetArgs> { };
 
 export class OctetSync extends _OctetSync implements OctetImpl<"sync"> {
     #parts = getPartsSync(this.address);
-    #networkNum = partsToNetworkNum(this.#parts);
-    #maskNum = prefixToMaskNum(this.#parts.prefix);
+    #networkNum = cidrToUInt(this.#parts);
+    #maskNum = prefixToUInt(this.#parts.prefix);
     #broadcastNum = partsToBroadcastNumber(this.#parts);
 
     public readonly base = numToIp(this.#networkNum);
@@ -29,7 +29,7 @@ export class OctetSync extends _OctetSync implements OctetImpl<"sync"> {
     public readonly bitmask = this.#parts.prefix;
     public readonly hostmask = numToIp(hostmaskNum(this.#maskNum));
     public readonly broadcast = numToIp(this.#broadcastNum);
-    public readonly size = getSize(this.#parts.prefix);
+    public readonly addressCount = getAddressCount(this.#parts.prefix);
     public readonly first = numToIp(getFirst(this.#parts.prefix, this.#networkNum));
     public readonly last = numToIp(getLast(this.#parts.prefix, this.#broadcastNum));
     public readonly version = "ipv4";

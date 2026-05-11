@@ -1,5 +1,21 @@
 import { Data, Effect } from "effect";
-import { OctetError, type OctetImpl, type OctetArgs, isPrivate, getParts, partsToNetworkNum, prefixToMaskNum, partsToBroadcastNumber, numToIp, hostmaskNum, getSize, getFirst, getLast, contains_effect, type Address } from "./common";
+import { 
+    OctetError, 
+    type OctetImpl, 
+    type OctetArgs, 
+    isPrivate, 
+    getParts, 
+    cidrToUInt, 
+    prefixToUInt, 
+    partsToBroadcastNumber, 
+    numToIp, 
+    hostmaskNum, 
+    getAddressCount, 
+    getFirst, 
+    getLast, 
+    contains_effect, 
+} from "./common";
+import type { Address } from "./schemas";
 
 class OctetEffect extends Data.Class<OctetImpl<"effect"> & OctetArgs> { };
 
@@ -24,8 +40,8 @@ export const MakeEffect: (
     args: OctetArgs
 ) => Effect.Effect<OctetEffect, OctetError, never> = Effect.fn(function* (args) {
     const parts = yield* getParts(args.address);
-    const networkNum = partsToNetworkNum(parts);
-    const maskNum = prefixToMaskNum(parts.prefix);
+    const networkNum = cidrToUInt(parts);
+    const maskNum = prefixToUInt(parts.prefix);
     const broadcastNum = partsToBroadcastNumber(parts);
 
     return new OctetEffect({
@@ -37,7 +53,7 @@ export const MakeEffect: (
         bitmask: parts.prefix,
         hostmask: numToIp(hostmaskNum(maskNum)),
         broadcast: numToIp(broadcastNum),
-        size: getSize(parts.prefix),
+        addressCount: getAddressCount(parts.prefix),
         first: numToIp(getFirst(parts.prefix, networkNum)),
         last: numToIp(getLast(parts.prefix, broadcastNum)),
         contains: (address: string) => contains_effect(address as Address, networkNum, maskNum)
