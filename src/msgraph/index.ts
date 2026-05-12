@@ -71,8 +71,8 @@ export class MsGraph extends Context.Service<MsGraph>()("effect-services/msgraph
 }
 
 export const PaginationFields = S.Struct({
-    "@odata.context": S.URL,
-    "@odata.nextLink": S.optional(S.URL),
+    "@odata.context": S.URLFromString,
+    "@odata.nextLink": S.optional(S.URLFromString),
     value: S.Array(S.Unknown)
 });
 
