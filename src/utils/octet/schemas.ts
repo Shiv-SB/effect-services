@@ -22,16 +22,20 @@ const CIDR_REGEX = new RegExp(`^(${IPV4_OCTET}\\.){3}${IPV4_OCTET}\\/${CIDR_MASK
 
 export const IpSchema = S.String.pipe(
     S.refine((s): s is IpAddress => IPV4_REGEX.test(s))
-)
+).annotate({
+    identifier: "IP Address"
+});
 
 export const CidrSchema = S.String.pipe(
     S.refine((s): s is Cidr => CIDR_REGEX.test(s))
-)
+);
 
 export const IpOrCidrSchema = S.Union([
     IpSchema,
     CidrSchema,
-]);
+]).annotate({
+    message: "Ip or CIDR Schema",
+});
 
 export type IpAddress = `${number}.${number}.${number}.${number}`;
 export type Cidr = `${IpAddress}/${number}`;

@@ -2,7 +2,7 @@ import * as T from "@effect/vitest";
 import * as B from "bun:test";
 import * as O from "../../../src/utils/octet/index";
 import { OctetSync } from "../../../src/utils/octet/octet-sync";
-import { Effect, Result } from "effect";
+import { Effect } from "effect";
 import { type Address } from '../../../src/utils/octet/schemas';
 import * as common from "../../../src/utils/octet/common";
 
