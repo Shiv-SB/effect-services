@@ -2,7 +2,7 @@ import * as T from "@effect/vitest";
 import * as B from "bun:test";
 import * as O from "../../../src/utils/octet/index";
 import { OctetSync } from "../../../src/utils/octet/octet-sync";
-import { Effect } from "effect";
+import { Effect, Result } from "effect";
 import { type Address } from '../../../src/utils/octet/schemas';
 import * as common from "../../../src/utils/octet/common";
 
@@ -252,7 +252,7 @@ B.describe("Octet Internals", () => {
         });
     });
 
-    B.describe.only(common.getLast, () => {
+    B.describe(common.getLast, () => {
         const testCases: [number, number, number][] = [
             // /31 and /32 should return the broadcast unchanged
             [31, 0, 0],
@@ -287,16 +287,305 @@ B.describe("Octet Internals", () => {
     });
 });
 
-T.describe("Octet Sync", () => {
+T.describe.only("Octet Sync", () => {
     T.effect("should construct with valid IP address", () => Effect.gen(function* () {
         const address = "192.168.0.1";
         const octet = yield* O.MakeSync({ address });
-        T.expect(octet).toBeInstanceOf(OctetSync)
+
+        T.expect(octet).toBeInstanceOf(OctetSync);
+
+        T.expect(octet.version).toBe("ipv4");
+        T.expect(octet.base).toBe("192.168.0.1");
+        T.expect(octet.mask).toBe("255.255.255.255");
+        T.expect(octet.bitmask).toBe(32);
+        T.expect(octet.hostmask).toBe("0.0.0.0");
+        T.expect(octet.broadcast).toBe("192.168.0.1");
+        T.expect(octet.addressCount).toBe(1);
+        T.expect(octet.first).toBe("192.168.0.1");
+        T.expect(octet.last).toBe("192.168.0.1");
+        T.expect(octet.private).toBe(true);
     }));
 
     T.effect("should construct with valid CIDR", () => Effect.gen(function* () {
         const address = "192.168.0.1/24";
         const octet = yield* O.MakeSync({ address });
+
         T.expect(octet).toBeInstanceOf(OctetSync);
+
+        T.expect(octet.version).toBe("ipv4");
+        T.expect(octet.base).toBe("192.168.0.0");
+        T.expect(octet.mask).toBe("255.255.255.0");
+        T.expect(octet.bitmask).toBe(24);
+        T.expect(octet.hostmask).toBe("0.0.0.255");
+        T.expect(octet.broadcast).toBe("192.168.0.255");
+        T.expect(octet.addressCount).toBe(256);
+        T.expect(octet.first).toBe("192.168.0.1");
+        T.expect(octet.last).toBe("192.168.0.254");
+        T.expect(octet.private).toBe(true);
+    }));
+
+    T.effect("should correctly calculate a /30 network", () => Effect.gen(function* () {
+        const octet = yield* O.MakeSync({
+            address: "10.0.0.1/30"
+        });
+
+        T.expect(octet.base).toBe("10.0.0.0");
+        T.expect(octet.mask).toBe("255.255.255.252");
+        T.expect(octet.hostmask).toBe("0.0.0.3");
+        T.expect(octet.broadcast).toBe("10.0.0.3");
+        T.expect(octet.addressCount).toBe(4);
+        T.expect(octet.first).toBe("10.0.0.1");
+        T.expect(octet.last).toBe("10.0.0.2");
+    }));
+
+    T.effect("should correctly calculate a /31 network", () => Effect.gen(function* () {
+        const octet = yield* O.MakeSync({
+            address: "10.0.0.0/31"
+        });
+
+        T.expect(octet.base).toBe("10.0.0.0");
+        T.expect(octet.mask).toBe("255.255.255.254");
+        T.expect(octet.hostmask).toBe("0.0.0.1");
+        T.expect(octet.broadcast).toBe("10.0.0.1");
+        T.expect(octet.addressCount).toBe(2);
+
+        // RFC3021 behaviour
+        T.expect(octet.first).toBe("10.0.0.0");
+        T.expect(octet.last).toBe("10.0.0.1");
+    }));
+
+    T.effect("should correctly calculate a /32 network", () => Effect.gen(function* () {
+        const octet = yield* O.MakeSync({
+            address: "8.8.8.8/32"
+        });
+
+        T.expect(octet.base).toBe("8.8.8.8");
+        T.expect(octet.mask).toBe("255.255.255.255");
+        T.expect(octet.hostmask).toBe("0.0.0.0");
+        T.expect(octet.broadcast).toBe("8.8.8.8");
+        T.expect(octet.addressCount).toBe(1);
+        T.expect(octet.first).toBe("8.8.8.8");
+        T.expect(octet.last).toBe("8.8.8.8");
+        T.expect(octet.private).toBe(false);
+    }));
+
+    T.effect("should correctly calculate a /0 network", () => Effect.gen(function* () {
+        const octet = yield* O.MakeSync({
+            address: "0.0.0.0/0"
+        });
+
+        T.expect(octet.base).toBe("0.0.0.0");
+        T.expect(octet.mask).toBe("0.0.0.0");
+        T.expect(octet.hostmask).toBe("255.255.255.255");
+        T.expect(octet.broadcast).toBe("255.255.255.255");
+        T.expect(octet.addressCount).toBe(4294967296);
+        T.expect(octet.first).toBe("0.0.0.1");
+        T.expect(octet.last).toBe("255.255.255.254");
+    }));
+
+    T.effect("contains should return true for addresses inside the subnet", () => Effect.gen(function* () {
+        const octet = yield* O.MakeSync({
+            address: "192.168.1.10/24"
+        });
+
+        T.expect(octet.contains("192.168.1.1")).toBe(true);
+        T.expect(octet.contains("192.168.1.254")).toBe(true);
+        T.expect(octet.contains("192.168.1.10")).toBe(true);
+    }));
+
+    T.effect("contains should return false for addresses outside the subnet", () => Effect.gen(function* () {
+        const octet = yield* O.MakeSync({
+            address: "192.168.1.10/24"
+        });
+
+        T.expect(octet.contains("192.168.0.1")).toBe(false);
+        T.expect(octet.contains("192.168.2.1")).toBe(false);
+        T.expect(octet.contains("10.0.0.1")).toBe(false);
+    }));
+
+    T.effect("contains should work correctly for /32 networks", () => Effect.gen(function* () {
+        const octet = yield* O.MakeSync({
+            address: "1.1.1.1/32"
+        });
+
+        T.expect(octet.contains("1.1.1.1")).toBe(true);
+        T.expect(octet.contains("1.1.1.2")).toBe(false);
+    }));
+
+    T.effect("contains should work correctly for /0 networks", () => Effect.gen(function* () {
+        const octet = yield* O.MakeSync({
+            address: "0.0.0.0/0"
+        });
+
+        T.expect(octet.contains("1.1.1.1")).toBe(true);
+        T.expect(octet.contains("8.8.8.8")).toBe(true);
+        T.expect(octet.contains("255.255.255.255")).toBe(true);
+    }));
+
+    T.effect("should throw on invalid addresses", () => Effect.gen(function* () {
+        // TODO
     }));
 });
+
+T.describe.only("Octet Effect", () => {
+    T.effect("should construct with valid IP address", () => Effect.gen(function* () {
+        const address = "192.168.0.1";
+        const octet = yield* O.MakeEffect({ address });
+
+        T.expect(octet.version).toBe("ipv4");
+        T.expect(octet.base).toBe("192.168.0.1");
+        T.expect(octet.mask).toBe("255.255.255.255");
+        T.expect(octet.bitmask).toBe(32);
+        T.expect(octet.hostmask).toBe("0.0.0.0");
+        T.expect(octet.broadcast).toBe("192.168.0.1");
+        T.expect(octet.addressCount).toBe(1);
+        T.expect(octet.first).toBe("192.168.0.1");
+        T.expect(octet.last).toBe("192.168.0.1");
+        T.expect(octet.private).toBe(true);
+    }));
+
+    T.effect("should construct with valid CIDR", () => Effect.gen(function* () {
+        const address = "192.168.0.1/24";
+        const octet = yield* O.MakeEffect({ address });
+
+        T.expect(octet.version).toBe("ipv4");
+        T.expect(octet.base).toBe("192.168.0.0");
+        T.expect(octet.mask).toBe("255.255.255.0");
+        T.expect(octet.bitmask).toBe(24);
+        T.expect(octet.hostmask).toBe("0.0.0.255");
+        T.expect(octet.broadcast).toBe("192.168.0.255");
+        T.expect(octet.addressCount).toBe(256);
+        T.expect(octet.first).toBe("192.168.0.1");
+        T.expect(octet.last).toBe("192.168.0.254");
+        T.expect(octet.private).toBe(true);
+    }));
+
+    T.effect("should correctly calculate a /30 network", () => Effect.gen(function* () {
+        const octet = yield* O.MakeEffect({
+            address: "10.0.0.1/30"
+        });
+
+        T.expect(octet.base).toBe("10.0.0.0");
+        T.expect(octet.mask).toBe("255.255.255.252");
+        T.expect(octet.hostmask).toBe("0.0.0.3");
+        T.expect(octet.broadcast).toBe("10.0.0.3");
+        T.expect(octet.addressCount).toBe(4);
+        T.expect(octet.first).toBe("10.0.0.1");
+        T.expect(octet.last).toBe("10.0.0.2");
+    }));
+
+    T.effect("should correctly calculate a /31 network", () => Effect.gen(function* () {
+        const octet = yield* O.MakeEffect({
+            address: "10.0.0.0/31"
+        });
+
+        T.expect(octet.base).toBe("10.0.0.0");
+        T.expect(octet.mask).toBe("255.255.255.254");
+        T.expect(octet.hostmask).toBe("0.0.0.1");
+        T.expect(octet.broadcast).toBe("10.0.0.1");
+        T.expect(octet.addressCount).toBe(2);
+
+        // RFC3021 behaviour
+        T.expect(octet.first).toBe("10.0.0.0");
+        T.expect(octet.last).toBe("10.0.0.1");
+    }));
+
+    T.effect("should correctly calculate a /32 network", () => Effect.gen(function* () {
+        const octet = yield* O.MakeEffect({
+            address: "8.8.8.8/32"
+        });
+
+        T.expect(octet.base).toBe("8.8.8.8");
+        T.expect(octet.mask).toBe("255.255.255.255");
+        T.expect(octet.hostmask).toBe("0.0.0.0");
+        T.expect(octet.broadcast).toBe("8.8.8.8");
+        T.expect(octet.addressCount).toBe(1);
+        T.expect(octet.first).toBe("8.8.8.8");
+        T.expect(octet.last).toBe("8.8.8.8");
+        T.expect(octet.private).toBe(false);
+    }));
+
+    T.effect("should correctly calculate a /0 network", () => Effect.gen(function* () {
+        const octet = yield* O.MakeEffect({
+            address: "0.0.0.0/0"
+        });
+
+        T.expect(octet.base).toBe("0.0.0.0");
+        T.expect(octet.mask).toBe("0.0.0.0");
+        T.expect(octet.hostmask).toBe("255.255.255.255");
+        T.expect(octet.broadcast).toBe("255.255.255.255");
+        T.expect(octet.addressCount).toBe(4294967296);
+        T.expect(octet.first).toBe("0.0.0.1");
+        T.expect(octet.last).toBe("255.255.255.254");
+    }));
+
+    T.effect("contains should return true for addresses inside the subnet", () => Effect.gen(function* () {
+        const octet = yield* O.MakeEffect({
+            address: "192.168.1.10/24"
+        });
+
+        const r1 = yield* octet.contains("192.168.1.1");
+        const r2 = yield* octet.contains("192.168.1.254");
+        const r3 = yield* octet.contains("192.168.1.10");
+
+        T.expect(r1).toBe(true);
+        T.expect(r2).toBe(true);
+        T.expect(r3).toBe(true);
+    }));
+
+    T.effect("contains should return false for addresses outside the subnet", () => Effect.gen(function* () {
+        const octet = yield* O.MakeEffect({
+            address: "192.168.1.10/24"
+        });
+
+        const r1 = yield* octet.contains("192.168.0.1");
+        const r2 = yield* octet.contains("192.168.2.1");
+        const r3 = yield* octet.contains("10.0.0.1");
+
+        T.expect(r1).toBe(false);
+        T.expect(r2).toBe(false);
+        T.expect(r3).toBe(false);
+    }));
+
+    T.effect("contains should work correctly for /32 networks", () => Effect.gen(function* () {
+        const octet = yield* O.MakeEffect({
+            address: "1.1.1.1/32"
+        });
+
+        const r1 = yield* octet.contains("1.1.1.1");
+        const r2 = yield* octet.contains("1.1.1.2");
+
+        T.expect(r1).toBe(true);
+        T.expect(r2).toBe(false);
+    }));
+
+    T.effect("contains should work correctly for /0 networks", () => Effect.gen(function* () {
+        const octet = yield* O.MakeEffect({
+            address: "0.0.0.0/0"
+        });
+
+        const r1 = yield* octet.contains("1.1.1.1");
+        const r2 = yield* octet.contains("8.8.8.8");
+        const r3 = yield* octet.contains("255.255.255.255");
+
+        T.expect(r1).toBe(true);
+        T.expect(r2).toBe(true);
+        T.expect(r3).toBe(true);
+    }));
+
+    T.effect("should return error on invalid addresses", () => Effect.gen(function* () {
+        const octect = yield* O.MakeEffect({
+            address: "192.168.0.300"
+        }).pipe(Effect.result);
+
+        T.expect(octect._tag).toBe("Failure");
+        
+        if (octect._tag === "Failure") {
+            T.expect(octect.failure).toBeInstanceOf(O.OctetError);
+            console.error(octect.failure.message);
+        } else {
+            T.expect.unreachable("Octet result should have fail tag!");
+        }
+    }));
+});
+
