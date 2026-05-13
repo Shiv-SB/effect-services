@@ -40,5 +40,9 @@ export interface BloomFilterImpl {
 }
 
 export interface ScalableBloomFilterArgs extends BloomFilterArgs {
+    /**
+     * Factor by which capacity increases per new layer
+     * @default 2
+     */
     growthFactor?: number;
 }

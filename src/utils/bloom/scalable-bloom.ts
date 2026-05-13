@@ -1,6 +1,42 @@
 import { BloomFilter } from "./bloom";
 import type { BloomFilterImpl, ScalableBloomFilterArgs } from "./common";
 
+/**
+ * A Scalable Bloom Filter implementation that dynamically grows by adding
+ * new Bloom filter layers as capacity is reached.
+ *
+ * Unlike a standard Bloom filter with a fixed size and false-positive rate,
+ * this structure maintains accuracy over time by:
+ * - Adding new filters when existing ones become full
+ * - Reducing the false-positive probability per layer to keep the overall
+ *   cumulative false-positive rate bounded
+ *
+ * ### Characteristics
+ * - **Unbounded growth**: Automatically expands to accommodate more items
+ * - **Layered structure**: Internally maintains multiple Bloom filters
+ * - **Controlled false positives**: Each additional layer lowers its individual
+ *   false-positive rate to preserve the overall target probability
+ *
+ * ### Use cases
+ * - Long-lived datasets with unknown or growing size
+ * - High-throughput ETL or streaming systems
+ * - Deduplication where memory efficiency is critical
+ *
+ * @example
+ * ```ts
+ * const filter = new ScalableBloomFilter({
+ *   item_count: 1000,
+ *   fp_prob: 0.01,
+ *   growthFactor: 2,
+ * });
+ *
+ * filter.insert("foo");
+ *
+ * console.log(filter.has("foo")); // true
+ * console.log(filter.has("bar")); // possibly false
+ * ```
+ *
+ */
 export class ScalableBloomFilter
     implements BloomFilterImpl {
 
