@@ -6,7 +6,6 @@ export class ScalableBloomFilter
 
     private filters: BloomFilter[] = [];
 
-    private initialCapacity: number;
     private fpProb: number;
     private growthFactor: number;
 
@@ -17,7 +16,6 @@ export class ScalableBloomFilter
             growthFactor = 2,
         } = args;
 
-        this.initialCapacity = item_count;
         this.fpProb = fp_prob;
         this.growthFactor = growthFactor;
 
@@ -43,10 +41,10 @@ export class ScalableBloomFilter
         // remains bounded
         const nextFpProb = this.fpProb / (this.filters.length + 1);
 
-        console.log("Growing bloom filter", {
+        /*console.log("Growing bloom filter", {
             nextCapacity,
             nextFpProb,
-        });
+        });*/
 
         this.filters.push(
             new BloomFilter({
