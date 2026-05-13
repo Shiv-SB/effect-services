@@ -144,6 +144,8 @@ import * as Utils from "effect-services/utils";
 
 **Features:**
 - Task scheduling for development environments via Crons and CLI
+- IP Address and CIDR parsing
+- Dynamic bloom filters
 ---
 
 ### Azure File Share
