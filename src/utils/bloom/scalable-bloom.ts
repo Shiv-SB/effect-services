@@ -1,5 +1,5 @@
 import { BloomFilter } from "./bloom";
-import { BloomFilterImpl, ScalableBloomFilterArgs } from "./common";
+import type { BloomFilterImpl, ScalableBloomFilterArgs } from "./common";
 
 export class ScalableBloomFilter
     implements BloomFilterImpl {
@@ -27,8 +27,7 @@ export class ScalableBloomFilter
         );
     }
 
-    private getCurrentFilter = (): BloomFilter =>
-        this.filters[this.filters.length - 1];
+    private getCurrentFilter = (): BloomFilter => this.filters[this.filters.length - 1]!;
 
     private grow = (): void => {
         const current = this.getCurrentFilter();

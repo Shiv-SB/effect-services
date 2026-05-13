@@ -1,4 +1,4 @@
-import { BloomFilterImpl, BloomFilterArgs } from "./common";
+import type { BloomFilterImpl, BloomFilterArgs } from "./common";
 
 const SizeOfBitArray = (
     n: number,
@@ -71,7 +71,7 @@ export class BloomFilter implements BloomFilterImpl {
         const bitIdx = index % 8;
 
         return (
-            (this.bits[byteIdx] & (1 << bitIdx)) !== 0
+            (this.bits[byteIdx]! & (1 << bitIdx)) !== 0
         );
     };
 
@@ -79,7 +79,7 @@ export class BloomFilter implements BloomFilterImpl {
         const byteIdx = Math.floor(index / 8);
         const bitIdx = index % 8;
 
-        this.bits[byteIdx] |= (1 << bitIdx);
+        this.bits[byteIdx]! |= (1 << bitIdx);
     };
 
     public insert = (item: string): void => {
