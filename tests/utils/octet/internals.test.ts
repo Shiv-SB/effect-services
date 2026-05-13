@@ -422,7 +422,7 @@ T.describe.only("Octet Sync", () => {
         T.expect(octet.contains("255.255.255.255")).toBe(true);
     }));
 
-    B.test.only("should throw on invalid address", () => {
+    B.test("should throw on invalid address", () => {
         const make = O.MakeSync({ address: "192.168.0.300" });
         const result = Effect.runSyncExit(make);
         if (result._tag !== "Failure") {
