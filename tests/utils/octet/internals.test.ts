@@ -422,12 +422,16 @@ T.describe.only("Octet Sync", () => {
         T.expect(octet.contains("255.255.255.255")).toBe(true);
     }));
 
-    T.effect("should throw on invalid addresses", () => Effect.gen(function* () {
-        // TODO
-    }));
+    B.test.only("should throw on invalid address", () => {
+        const make = O.MakeSync({ address: "192.168.0.300" });
+        const result = Effect.runSyncExit(make);
+        if (result._tag !== "Failure") {
+            B.expect.unreachable("Should of thrown here!");
+        }
+    });
 });
 
-T.describe.only("Octet Effect", () => {
+T.describe("Octet Effect", () => {
     T.effect("should construct with valid IP address", () => Effect.gen(function* () {
         const address = "192.168.0.1";
         const octet = yield* O.MakeEffect({ address });
@@ -582,7 +586,6 @@ T.describe.only("Octet Effect", () => {
         
         if (octect._tag === "Failure") {
             T.expect(octect.failure).toBeInstanceOf(O.OctetError);
-            console.error(octect.failure.message);
         } else {
             T.expect.unreachable("Octet result should have fail tag!");
         }
