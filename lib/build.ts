@@ -30,13 +30,12 @@ function hasUppercase(str: string): boolean {
 }
 
 function getAllIndexFiles(): string[] {
-    const glob = new Bun.Glob("**/index.ts");
-    const src = "./src";
+    const glob = new Bun.Glob("src/*/index.ts");
     const files: string[] = [];
 
-    for (const file of glob.scanSync(src)) {
-        //console.log(" >", file);
-        files.push(path.join(src, file));
+    for (const file of glob.scanSync(".")) {
+        console.log(" >", file);
+        files.push(file);
     }
 
     printC("cyan", "Detected entrypoints:");
