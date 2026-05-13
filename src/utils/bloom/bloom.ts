@@ -18,7 +18,6 @@ export class BloomFilter implements BloomFilterImpl {
     private capacity: number;
     private inserted = 0;
 
-    private fp_prob: number;
     private size: number;
     private hash_count: number;
 
@@ -32,7 +31,6 @@ export class BloomFilter implements BloomFilterImpl {
         } = args;
 
         this.capacity = item_count;
-        this.fp_prob = fp_prob;
 
         this.size = SizeOfBitArray(item_count, fp_prob);
         this.hash_count = OptimumNoOfHashFuncs(
@@ -44,17 +42,21 @@ export class BloomFilter implements BloomFilterImpl {
 
         this.bits = Buffer.alloc(byteSize, 0);
 
-        console.log({
+        /*console.log({
             capacity: this.capacity,
             fp_prob: this.fp_prob,
             size_bits: this.size,
             size_bytes: byteSize,
             hash_count: this.hash_count,
-        });
+        });*/
     }
 
     public isAtCapacity = (): boolean =>
         this.inserted >= this.capacity;
+
+    public get currentSize() {
+        return this.inserted;
+    }
 
     public getCapacity = (): number =>
         this.capacity;
@@ -83,6 +85,7 @@ export class BloomFilter implements BloomFilterImpl {
     };
 
     public insert = (item: string): void => {
+        if (typeof item !== "string") return;
         const h1 = this.hasher(item, 0);
         const h2 = this.hasher(item, 1);
 
