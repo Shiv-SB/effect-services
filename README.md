@@ -15,8 +15,6 @@
   </a>
 </p>
 
-## Overview
-
 A collection of various Effectful services to communicate with 3rd party services, as well as utilities.
 
 The modules included are used for my specific use-cases and so may be opionated, but I have attempted to make them as generic as possible nevertheless.
@@ -146,6 +144,7 @@ import * as Utils from "effect-services/utils";
 - Task scheduling for development environments via Crons and CLI
 - IP Address and CIDR parsing
 - Dynamic bloom filters
+- Math functions
 ---
 
 ### Azure File Share
