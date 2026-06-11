@@ -5,7 +5,7 @@ import * as fsSync from "node:fs";
 import pkg from "../package.json";
 import { Schema } from "effect";
 
-// # region Utils
+// #region Utils
 
 function printC(
     col: string,
@@ -30,13 +30,12 @@ function hasUppercase(str: string): boolean {
 }
 
 function getAllIndexFiles(): string[] {
-    const glob = new Bun.Glob("**/index.ts");
-    const src = "./src";
+    const glob = new Bun.Glob("src/*/index.ts");
     const files: string[] = [];
 
-    for (const file of glob.scanSync(src)) {
-        //console.log(" >", file);
-        files.push(path.join(src, file));
+    for (const file of glob.scanSync(".")) {
+        console.log(" >", file);
+        files.push(file);
     }
 
     printC("cyan", "Detected entrypoints:");
@@ -156,9 +155,9 @@ const build = await Bun.build({
     minify: false,
     outdir: "build",
     splitting: true,
-    sourcemap: "none",
+    sourcemap: "inline",
     format: "esm",
-    target: "node",
+    target: "bun",
 });
 
 const end = performance.now();
