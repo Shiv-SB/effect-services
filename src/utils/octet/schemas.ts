@@ -1,5 +1,9 @@
 import { Schema as S } from "effect";
 
+export type IpAddress = `${number}.${number}.${number}.${number}`;
+export type Cidr = `${IpAddress}/${number}`;
+export type Address = typeof IpOrCidrSchema.Type | (string & { });
+
 /**
  * Strict IPv4 octet:
  *
@@ -36,7 +40,3 @@ export const IpOrCidrSchema = S.Union(
 ).annotations({
     identifier: "Ip or CIDR Schema",
 });
-
-export type IpAddress = `${number}.${number}.${number}.${number}`;
-export type Cidr = `${IpAddress}/${number}`;
-export type Address = typeof IpOrCidrSchema.Type;
