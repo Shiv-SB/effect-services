@@ -1,3 +1,3 @@
 export * from "./scheduler";
 
-export * as Octect from "./octet/index";
+export * as Octet from "./octet/index";
