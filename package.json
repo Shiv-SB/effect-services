@@ -12,6 +12,9 @@
     "build:cicd": "bun lib/build cicd",
     "prepublishOnly": "bun run build"
   },
+  "publishConfig": {
+    "tag": "V2"
+  },
   "repository": {
     "url": "https://github.com/Shiv-SB/effect-services"
   },
