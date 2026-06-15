@@ -33,7 +33,7 @@ export class ContainerClientSDK extends Context.Service<ContainerClientSDK>()("e
             .container(config.containerID);
 
         const caller: ContainerSdkImpl = {
-            use: (fn) => Effect.gen(function* () {
+            use: Effect.fn("ContainerClientSDK.use")(function* (fn) {
                 const result = yield* Effect.try({
                     try: () => fn(client),
                     catch: (e) => new CosmosError({

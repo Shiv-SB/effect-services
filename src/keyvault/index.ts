@@ -35,7 +35,7 @@ export class KeyVault extends Context.Service<KeyVault>()("effect-services/keyva
         const _client = new SecretClient(url, config.credential);
 
         const caller: KeyVaultImpl = {
-            use: (fn) => Effect.gen(function* () {
+            use: Effect.fn(function* (fn) {
                 const result = yield* Effect.try({
                     try: () => fn(_client),
                     catch: (e) => new KeyVaultError({
@@ -68,7 +68,7 @@ export class KeyVault extends Context.Service<KeyVault>()("effect-services/keyva
 export type CacheOptions = Omit<Parameters<typeof Cache["make"]>[0], "lookup">;
 
 export class KeyVaultAsCache extends Context.Service<KeyVaultAsCache>()("effect-services/keyvault/index/KeyVaultAsCache", {
-    make: Effect.fn("keyvaultcache.make")(function* (options: CacheOptions) {
+    make: Effect.fnUntraced(function* (options: CacheOptions) {
         const kv = yield* KeyVault;
         const cache = yield* Cache.make({
             ...options,

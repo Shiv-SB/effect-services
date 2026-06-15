@@ -1,4 +1,4 @@
-import { Context, Duration, Effect, Layer, Schedule, Stream, flow } from 'effect';
+import { Context, Duration, Effect, Layer, Schedule, Stream, flow, pipe } from 'effect';
 import { type CosmosSDKConfigOpts } from "./cosmosSDK";
 import { CosmosClient as _client, ErrorResponse, type ItemDefinition, type SqlQuerySpec } from "@azure/cosmos";
 import { CosmosError } from "./common";
@@ -49,7 +49,7 @@ export class CosmosClient extends Context.Service<CosmosClient>()("effect-servic
                 Effect.retry({ schedule: RetryPolicy }),
             ));
 
-            const allItems = Effect.gen(function* () {
+            const allItems: Effect.Effect<Stream.Stream<ItemDefinition, CosmosError>> = Effect.gen(function* () {
                 const feed = containerClient.items.readAll().getAsyncIterator();
                 const stream = Stream.fromAsyncIterable(feed, (e) => new CosmosError({
                     cause: e,

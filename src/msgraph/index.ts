@@ -40,7 +40,7 @@ export class MsGraph extends Context.Service<MsGraph>()("effect-services/msgraph
         const client = Client.initWithMiddleware({ authProvider });
 
         const caller: MsGraphImpl = {
-            use: (fn) => Effect.gen(function* () {
+            use: Effect.fn(function* (fn) {
                 const result = yield* Effect.try({
                     try: () => fn(client),
                     catch: (e) => new MsGraphError({
@@ -80,7 +80,7 @@ export const MakeStream = Effect.fn(function* (request: GraphRequest) {
     const graph = yield* MsGraph;
     const decode = S.decodeUnknownEffect(PaginationFields);
 
-    const stream = Stream.paginate(request, (req) => Effect.gen(function* () {
+    const stream = Stream.paginate(request, Effect.fn(function* (req) {
         const GetResponse = Effect.tryPromise({
             try: () => req.get(),
             catch: (e) => new MsGraphError({

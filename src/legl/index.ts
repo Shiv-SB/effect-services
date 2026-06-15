@@ -35,11 +35,7 @@ export class Legl extends Context.Service<Legl>()("effect-services/legl/index/Le
             })
         );
 
-        const MakeStream = (
-            path: string,
-            queryParams?: SearchParamInput
-        ) => Effect.gen(function* () {
-
+        const MakeStream = Effect.fnUntraced(function* (path: string, queryParams?: SearchParamInput) {
             const initialURL = new URL(path, config.baseURL);
 
             if (queryParams) {
@@ -48,7 +44,7 @@ export class Legl extends Context.Service<Legl>()("effect-services/legl/index/Le
 
             const decode = HttpClientResponse.schemaBodyJson(LeglPaginationFieldsWithResult);
 
-            const stream = Stream.paginate(initialURL, (currentURL) => Effect.gen(function* () {
+            const stream = Stream.paginate(initialURL, Effect.fn(function* (currentURL) {
                 const response = yield* client.get(removeOrigin(currentURL));
                 const json = yield* decode(response);
 

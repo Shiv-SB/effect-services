@@ -1,6 +1,6 @@
 import * as S from "effect/Schema";
 
-export const OauthResposneSchema = S.Struct({
+export const OauthResponseSchema = S.Struct({
     access_token: S.String,
     expires_in: S.Int,
     token_type: S.Literal("Bearer"),
@@ -15,10 +15,10 @@ const OptStr = S.optionalKey(S.String);
 const OptInt = S.optionalKey(S.Int);
 const OptUtc = S.optionalKey(S.DateTimeUtc);
 
-const DefaultSecuritySchema = S.Literals(["public", "view", "private"]);
-const AccessSchema = S.Literals(["no_access", "read", "read_write", "full_access", "change_security"]);
+export const DefaultSecuritySchema = S.Literals(["public", "view", "private"]);
+export const AccessSchema = S.Literals(["no_access", "read", "read_write", "full_access", "change_security"]);
 const ContentTypeSchema = S.Literals(["D", 5]);
-const WsTypeSchema = S.Literals([
+export const WsTypeSchema = S.Literals([
     "document",
     "folder",
     "workspace",

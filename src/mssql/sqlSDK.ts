@@ -22,7 +22,7 @@ export class MsSqlSDK extends Context.Service<MsSqlSDK>()("effect-services/mssql
         });
 
         const caller: MsSqlSDKImpl = {
-            use: (fn) => Effect.gen(function* () {
+            use: Effect.fn(function* (fn) {
                 const result = yield* Effect.try({
                     try: () => fn(pool),
                     catch: (e) => new MsSqlError({

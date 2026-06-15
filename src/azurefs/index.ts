@@ -7,7 +7,7 @@ import {
     type DirectoryItem,
     type FileItem
 } from "@azure/storage-file-share";
-import { Context, Data, Effect, Layer, Option, Queue, Stream } from "effect";
+import { Context, Data, Effect, Layer, Queue, Result, Stream } from "effect";
 
 export interface AzureFsSdkConfigOpts {
     url: string;
@@ -78,14 +78,12 @@ export type DirType = {
 
 export type RecordType = FileType | DirType;
 
-type StreamReturnType = Stream.Stream<Option.Option<RecordType>, never>;
+type StreamReturnType = Stream.Stream<RecordType, AzureFsSdkError>;
 
 /**
  * A handy utility function to list all items in a given directory.
- * 
- * Due to the nature of the stream generation, the stream
- * will never throw an error. Instead it will return early with Option.none()
- * and log an error.
+ * The given directory is specified via the Service requirement
+ * (`ShareDirectoryClient`)
  */
 export const ToStream = Effect.gen(function* () {
     const client = yield* DirectoryClient;
@@ -97,22 +95,33 @@ export const ToStream = Effect.gen(function* () {
             cause: e,
             message: "Asyncronous error in ToStream"
         })
-    });
+    }).pipe(
+        Effect.result
+    );
 
     const stream: StreamReturnType = Stream.callback((q) => Effect.gen(function* () {
-        let { done, value } = yield* getNext;
-        while (!done) {
-            Queue.offerUnsafe(q, Option.some(value));
-            ({ done, value } = yield* getNext);
+        const getNextResult = yield* getNext;
+
+        if (Result.isFailure(getNextResult)) {
+            yield* Queue.fail(q, getNextResult.failure);
+            return;
         }
 
-        Queue.endUnsafe(q);
-    }).pipe(Effect.catch((e) => Effect.gen(function* () {
-        yield* Effect.logError("Unable to complete stream", e);
-        // cant emit errors with Stream.callback
-        // so return empty instead
-        return Option.none();
-    }))));
+        let { done, value } = getNextResult.success;
+
+        while (!done) {
+            Queue.offerUnsafe(q, value);
+            const getNextResult = yield* getNext;
+
+            if (Result.isFailure(getNextResult)) {
+                yield* Queue.fail(q, getNextResult.failure);
+            } else {
+                ({ done, value } = getNextResult.success);
+            }
+        }
+
+        yield* Queue.end(q);
+    }));
 
     return stream;
 });

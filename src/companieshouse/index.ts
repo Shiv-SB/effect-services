@@ -3,6 +3,7 @@ import { createApiClient } from "@companieshouse/api-sdk-node";
 import { Data, Effect, Context, Layer, flow, Schedule, Duration, DateTime } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import type { HttpClientError } from "effect/unstable/http/HttpClientError";
+import { unravel, type RedactedOr } from "../internals/helpers";
 
 export class CompaniesHouseError extends Data.TaggedError("CompaniesHouseError")<{
     cause?: unknown;
@@ -18,7 +19,7 @@ interface CompaniesHouseImpl {
 };
 
 export interface ConfigOpts {
-    apiKey: string;
+    apiKey: RedactedOr;
 }
 
 class Config extends Context.Service<Config, ConfigOpts>()("effect-services/companieshouse/index/Config") { }
@@ -28,19 +29,22 @@ const ConfigLayer = (opts: ConfigOpts) => Layer.succeed(Config, opts);
 /**
  * An Effectful, lightweight wrapper for the Companies House SDK.
  * Uses `@companieshouse/api-sdk-node.`
+ * 
+ * For a native Effect HTTP implementation with
+ * built in rate-limiting, see `CompaniesHouseClient`
  */
 export class CompaniesHouse extends Context.Service<CompaniesHouse>()("CompaniesHouse", {
     make: Effect.gen(function* () {
         const config = yield* Config;
-        const client = createApiClient(config.apiKey);
+        const client = createApiClient(unravel(config.apiKey));
 
         const caller: CompaniesHouseImpl = {
-            use: (fn) => Effect.gen(function* () {
+            use: Effect.fn(function* (fn) {
                 const result = yield* Effect.try({
                     try: () => fn(client),
                     catch: (e) => new CompaniesHouseError({
                         cause: e,
-                        message: "Syncronous error in CompaniesHouse.use"
+                        message: "Syncronous error in CompaniesHouse.use",
                     })
                 });
 
@@ -49,14 +53,14 @@ export class CompaniesHouse extends Context.Service<CompaniesHouse>()("Companies
                         try: () => result,
                         catch: (e) => new CompaniesHouseError({
                             cause: e,
-                            message: "Asyncronous error in CompaniseHouse.use",
+                            message: "Asyncronous error in CompaniesHouse.use",
                         })
                     });
                 } else {
                     return result;
                 }
             })
-        };
+        }
         return caller;
     })
 }) {
@@ -65,6 +69,9 @@ export class CompaniesHouse extends Context.Service<CompaniesHouse>()("Companies
     )
 }
 
+//#region Custom Client
+
+
 export interface ClientConfigOpts extends ConfigOpts {
     /**
      * If ommited, the base URL will default to
@@ -72,8 +79,6 @@ export interface ClientConfigOpts extends ConfigOpts {
      */
     baseURL?: string;
 }
-
-//#region Custom Client
 
 class ClientConfig extends Context.Service<ClientConfig, ClientConfigOpts>()("effect-services/companieshouse/index/ClientConfig") { }
 
@@ -86,7 +91,6 @@ const ClientConfigLayer = (opts: ClientConfigOpts) => Layer.succeed(ClientConfig
  * Will throw on any other 4xx or 5xx status
  */
 export class CompaniesHouseClient extends Context.Service<CompaniesHouseClient>()("effect-services/companieshouse/index/CompaniesHouseClient", {
-    // TODO: rewrite with proper impl like above
     make: Effect.gen(function* () {
         const config = yield* ClientConfig;
         /*
@@ -107,7 +111,6 @@ export class CompaniesHouseClient extends Context.Service<CompaniesHouseClient>(
             return Duration.zero;
         });
 
-
         const RetryPolicy = Schedule.identity<HttpClientError>().pipe(
             Schedule.addDelay((err) => handleRetry(err))
         );
@@ -117,7 +120,7 @@ export class CompaniesHouseClient extends Context.Service<CompaniesHouseClient>(
         const client: HttpClient.HttpClient.With<HttpClientError> = (yield* HttpClient.HttpClient).pipe(
             HttpClient.mapRequest(flow(
                 HttpClientRequest.prependUrl(baseURL),
-                HttpClientRequest.setHeader("Authorization", config.apiKey),
+                HttpClientRequest.setHeader("Authorization", unravel(config.apiKey)),
                 HttpClientRequest.acceptJson,
             )),
             HttpClient.filterStatusOk,
@@ -126,7 +129,6 @@ export class CompaniesHouseClient extends Context.Service<CompaniesHouseClient>(
                 schedule: RetryPolicy,
             }),
         );
-
 
         return client;
     })

@@ -1,7 +1,16 @@
-import { Context, Duration, Effect, flow, Layer, Option, Redacted, Schedule, Schema, Stream } from "effect";
+import { Context, Duration, Effect, flow, Layer, Option, Schedule, Schema, Stream } from "effect";
 import { FetchHttpClient, HttpClient, HttpClientRequest } from "effect/unstable/http";
 import type { HttpClientError } from "effect/unstable/http/HttpClientError";
-import { removeOrigin, unravel, type SearchParamInput } from "../internals/helpers";
+import { removeOrigin, unravel, type RedactedOr, type SearchParamInput } from "../internals/helpers";
+
+interface FreshServiceConfigOpts {
+    baseURL: string;
+    token: RedactedOr;
+}
+
+class FreshServiceConfig extends Context.Service<FreshServiceConfig, FreshServiceConfigOpts>()("effect-services/freshservice/index/FreshServiceConfig") { }
+
+const FreshServiceConfigLayer = (opts: FreshServiceConfigOpts) => Layer.succeed(FreshServiceConfig, opts);
 
 function extractLinkValue(linkHeaderValue: string): Option.Option<URL> {
     const match = linkHeaderValue.match(/<([^>]+)>/);
@@ -11,15 +20,6 @@ function extractLinkValue(linkHeaderValue: string): Option.Option<URL> {
         return Option.none();
     }
 }
-
-interface FreshServiceConfigOpts {
-    baseURL: string;
-    token: string | Redacted.Redacted<string>;
-}
-
-class FreshServiceConfig extends Context.Service<FreshServiceConfig, FreshServiceConfigOpts>()("effect-services/freshservice/index/FreshServiceConfig") { }
-
-const FreshServiceConfigLayer = (opts: FreshServiceConfigOpts) => Layer.succeed(FreshServiceConfig, opts);
 
 const handleRetry = Effect.fnUntraced(function* (err: HttpClientError) {
     if (err.response?.status === 429) {
@@ -63,7 +63,6 @@ export class FreshService extends Context.Service<FreshService>()("effect-servic
         const GenericListSchema = Schema.Record(Schema.String, Schema.Array(Schema.Unknown));
         const decode = Schema.decodeUnknownEffect(GenericListSchema);
 
-
         const MakeStream = (
             path: string,
             queryParams?: SearchParamInput
@@ -79,6 +78,7 @@ export class FreshService extends Context.Service<FreshService>()("effect-servic
 
             // URL without origin (origin is already set in client)
 
+            // TODO: try + test replacing
             const stream = Stream.paginate(initialURL, (currentURL) => Effect.gen(function* () {
                 yield* Effect.logDebug("FreshService Stream URL:", currentURL);
 
@@ -96,6 +96,7 @@ export class FreshService extends Context.Service<FreshService>()("effect-servic
 
                 return [responseArr, nextURL];
             }));
+
             return stream;
         })
 
