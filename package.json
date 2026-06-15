@@ -13,7 +13,7 @@
     "prepublishOnly": "bun run build"
   },
   "publishConfig": {
-    "tag": "V2"
+    "tag": "latest"
   },
   "repository": {
     "url": "https://github.com/Shiv-SB/effect-services"
