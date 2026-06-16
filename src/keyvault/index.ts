@@ -141,10 +141,10 @@ const MakeConfigHandler = (
     Effect.provide(KeyVault.layer(keyVaultOpts)),
     Effect.catchIf(
         () => keyVaultOpts.onKeyVaultError !== "throw",
-        (e) => Effect.gen(function* () {
+        Effect.fn(function* (e) {
             yield* Effect.logError("MakeConfigHandler caught error:", e);
             return yield* Effect.undefined;
-        })
+        }),
     ),
 ));
 

@@ -35,7 +35,7 @@ export class AzureFsSdkClient extends Context.Service<AzureFsSdkClient>()("Azure
         const _client = new ShareServiceClient(config.url, config.credential);
 
         const caller: AzureFsSdkImpl = {
-            use: (fn) => Effect.gen(function* () {
+            use: Effect.fn(function* (fn) {
                 const result = yield* Effect.try({
                     try: () => fn(_client),
                     catch: (e) => new AzureFsSdkError({
@@ -99,7 +99,7 @@ export const ToStream = Effect.gen(function* () {
         Effect.result
     );
 
-    const stream: StreamReturnType = Stream.callback((q) => Effect.gen(function* () {
+    const stream: StreamReturnType = Stream.callback(Effect.fn(function* (q) {
         const getNextResult = yield* getNext;
 
         if (Result.isFailure(getNextResult)) {

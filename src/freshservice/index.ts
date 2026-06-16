@@ -63,11 +63,7 @@ export class FreshService extends Context.Service<FreshService>()("effect-servic
         const GenericListSchema = Schema.Record(Schema.String, Schema.Array(Schema.Unknown));
         const decode = Schema.decodeUnknownEffect(GenericListSchema);
 
-        const MakeStream = (
-            path: string,
-            queryParams?: SearchParamInput
-        ) => Effect.gen(function* () {
-
+        const MakeStream = Effect.fn(function* (path: string, queryParams?: SearchParamInput) {
             const initialURL = new URL(path, config.baseURL);
 
             if (queryParams) {
@@ -79,7 +75,7 @@ export class FreshService extends Context.Service<FreshService>()("effect-servic
             // URL without origin (origin is already set in client)
 
             // TODO: try + test replacing
-            const stream = Stream.paginate(initialURL, (currentURL) => Effect.gen(function* () {
+            const stream = Stream.paginate(initialURL, Effect.fn(function* (currentURL) {
                 yield* Effect.logDebug("FreshService Stream URL:", currentURL);
 
                 const response = yield* client.get(removeOrigin(currentURL));

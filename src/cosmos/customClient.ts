@@ -1,4 +1,4 @@
-import { Context, Duration, Effect, Layer, Schedule, Stream, flow } from 'effect';
+import { Context, Duration, Effect, Layer, Schedule, Stream, flow, pipe } from 'effect';
 import { type CosmosSDKConfigOpts } from "./cosmosSDK";
 import { CosmosClient as _client, ErrorResponse, type ItemDefinition, type SqlQuerySpec } from "@azure/cosmos";
 import { CosmosError } from "./common";
@@ -13,7 +13,7 @@ export class CosmosClientConfig extends Context.Service<CosmosClientConfig, Cosm
 const CosmosConfigLayer = (opts: CosmosClientConfigOpts) => Layer.succeed(CosmosClientConfig, opts);
 
 export const RetryPolicy = Schedule.identity<CosmosError>().pipe(
-    Schedule.addDelay((e) => Effect.gen(function* () {
+    Schedule.addDelay(Effect.fn(function* (e) {
         if (e.cause instanceof ErrorResponse) {
             if (e.cause.retryAfterInMs) {
                 const dur = Duration.millis(e.cause.retryAfterInMs);
